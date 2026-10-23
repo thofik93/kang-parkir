@@ -1,0 +1,28 @@
+{
+  "name": "kang-parkir",
+  "version": "1.0.0",
+  "description": "Kang Parkir: game parkir kasual satu jari untuk web, Android, dan iOS",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "web": "node scripts/build-web.mjs",
+    "assets": "node scripts/make-assets.mjs && capacitor-assets generate --android --ios --iconBackgroundColor \"#123a8c\" --iconBackgroundColorDark \"#123a8c\" --splashBackgroundColor \"#123a8c\" --splashBackgroundColorDark \"#123a8c\"",
+    "sync": "npm run web && cap sync",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios",
+    "android:apk": "npm run sync && cd android && JAVA_HOME=\"${KP_JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./gradlew assembleDebug",
+    "android:bundle": "npm run sync && cd android && JAVA_HOME=\"${KP_JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.6.9",
+    "@capacitor/app": "7.1.2",
+    "@capacitor/core": "7.6.9",
+    "@capacitor/haptics": "7.0.5",
+    "@capacitor/ios": "7.6.9",
+    "@capacitor/status-bar": "7.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "7.6.9"
+  }
+}

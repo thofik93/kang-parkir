@@ -2,30 +2,32 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Game kasual satu jari: atur motor dan mobil di parkiran toko, tagih Rp2.000, dan tangkap motor yang kabur.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="Game kasual satu jari: atur motor dan mobil di parkiran, tagih tarifnya, dan tangkap motor yang kabur.">
 <meta name="theme-color" content="#123a8c">
 <meta property="og:title" content="Kang Parkir">
-<meta property="og:description" content="Atur parkiran, tagih Rp2.000, jangan sampai ada yang kabur. Main langsung di browser.">
+<meta property="og:description" content="Atur parkiran, tagih tarifnya, jangan sampai ada yang kabur. Main langsung di browser.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f6f7fb'/%3E%3Crect x='5' y='5' width='54' height='54' rx='9' fill='%23123a8c'/%3E%3Ctext x='32' y='47' font-family='Arial Black,sans-serif' font-size='42' font-weight='900' fill='%23f6f7fb' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
 <title>Kang Parkir</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: satu kolom sempit ala layar HP. Papan "P" biru sebagai dasar halaman, HUD menempel di atas lahan parkir, tombol di bawah. Satu tema, disengaja: warna rambu parkir + rompi oranye. */
+/* Layout: satu kolom sempit ala layar HP. Papan "P" biru sebagai dasar halaman, HUD menempel di atas lahan parkir, aksi utama selalu di bawah dalam jangkauan jempol. Satu tema, disengaja: warna rambu parkir + rompi oranye. */
 :root{
-  --sign:#123a8c;        /* biru rambu parkir */
+  --sign:#123a8c;
   --sign-deep:#0c2a68;
   --panel:#18469e;
   --line:#2a5bbd;
   --fg:#f6f7fb;
   --muted:#b8c6ea;
-  --vest:#ff7a1a;        /* rompi oranye */
-  --reflect:#e6f25a;     /* strip reflektor */
+  --vest:#ff7a1a;
+  --reflect:#e6f25a;
   --danger:#ff5a4f;
   --ok:#4fd18b;
-  --scrim:rgba(8,24,62,.9);
+  --paper:#fbf7ec;
+  --ink:#1d2433;
+  --scrim:rgba(8,24,62,.94);
   --display:"Poppins", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   --body:"Source Sans 3", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, monospace;
@@ -53,7 +55,7 @@ body{
 
 .game{display:flex;flex-direction:column;align-self:center;width:100%}
 .hud{
-  display:grid;grid-template-columns:auto auto 1fr auto;gap:4px 14px;align-items:end;
+  display:grid;grid-template-columns:auto auto 1fr auto auto;gap:4px 12px;align-items:end;
   background:var(--sign-deep);border:2px solid var(--line);border-bottom:0;border-radius:12px 12px 0 0;padding:8px 12px;
 }
 .stat{display:flex;flex-direction:column;min-width:0}
@@ -61,8 +63,10 @@ body{
 .v{font-family:var(--mono);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
 #hClock{color:var(--reflect)}
 #hKomplain{color:var(--danger);letter-spacing:.12em}
+#hLoc{overflow:hidden;text-overflow:ellipsis;font-family:var(--body);font-size:14px}
 .money{grid-column:1 / -1;display:flex;flex-direction:column;gap:3px}
-.money-row{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.money-row{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.money-row .tip{color:var(--muted);font-weight:600}
 .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--vest);transition:width .2s}
 .bar i.done{background:var(--ok)}
@@ -76,25 +80,89 @@ canvas{display:block;width:100%;max-width:100%;aspect-ratio:420/580;touch-action
   opacity:0;transition:opacity .2s;pointer-events:none;
 }
 .toast.show{opacity:1}
-.overlay{
-  position:absolute;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;
-  padding:16px;overflow:auto;
-}
-.card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px}
-.card h2{font-family:var(--display);font-weight:800;font-size:1.45rem;margin:0;line-height:1.15;text-wrap:balance}
+
+/* Overlay: kartu bisa digulir, tapi barisan aksi utama menempel di bawah */
+.overlay{position:absolute;inset:0;background:var(--scrim);display:flex;overflow:auto;overscroll-behavior:contain}
+.card{width:100%;max-width:420px;margin:auto;display:flex;flex-direction:column;gap:12px;padding:16px 16px 0}
+.card h2{font-family:var(--display);font-weight:800;font-size:1.35rem;margin:0;line-height:1.15;text-wrap:balance}
+.card h3{font-family:var(--display);font-weight:700;font-size:.95rem;margin:4px 0 0}
 .card p{margin:0}
+.actions{
+  position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;
+  padding:12px 0 16px;margin-top:auto;
+  background:linear-gradient(180deg,rgba(8,24,62,0),var(--sign-deep) 30%);
+}
+.actions .primary{flex:1 1 180px}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--reflect)}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}
 .steps b{color:var(--vest)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details summary{cursor:pointer;font-weight:700}
+details[open] summary{margin-bottom:8px}
 .pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;color:#10204a}
-.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.stats div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-width:0}
-.stats .v{display:block;font-size:17px}
+.wallet{display:flex;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.wallet .v{font-size:17px;color:var(--reflect)}
+
+.choices{display:grid;gap:8px}
+.choices.cols3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.choice{position:relative}
+.choice input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.choice .box{
+  display:flex;flex-direction:column;gap:2px;height:100%;
+  background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--muted)
+}
+.choice .box b{color:var(--fg);font-size:15px}
+.choice .box .price{font-family:var(--mono);color:var(--fg);font-size:12px}
+.choice input:checked + .box{border-color:var(--vest);background:var(--sign-deep)}
+.choice input:focus-visible + .box{outline:3px solid var(--reflect);outline-offset:2px}
+.choice input:disabled + .box{opacity:.5}
+.forecast{margin:0;padding-left:18px;font-size:14px;color:var(--muted)}
+.rule{font-size:13px;color:var(--muted)}
+
+/* Nota harian */
+.nota{background:var(--paper);color:var(--ink);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;box-shadow:0 6px 0 -3px rgba(0,0,0,.25)}
+.nota .head{text-align:center;font-weight:700;letter-spacing:.12em;border-bottom:1px dashed #9aa0ab;padding-bottom:6px;margin-bottom:6px}
+.nota .row{display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-variant-numeric:tabular-nums}
+.nota .row.sub{color:#5a6275}
+.nota .row.total{border-top:1px dashed #9aa0ab;margin-top:4px;padding-top:6px;font-weight:700}
+.nota .row.neg span:last-child{color:#b3261e}
+.nota .row.pos span:last-child{color:#1b7a46}
+.mini{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+.mini b{color:var(--fg);font-family:var(--mono)}
 .verdict{font-weight:700}
 .verdict.good{color:var(--ok)}
 .verdict.bad{color:var(--danger)}
-.share{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--sign-deep);border:1px dashed var(--line);border-radius:8px;padding:8px 10px;user-select:all;word-break:break-word}
+
+/* Warung */
+.items{display:flex;flex-direction:column;gap:8px}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.item .name{font-weight:700}
+.item .desc{grid-column:1;font-size:13px;color:var(--muted)}
+.item button{grid-row:1 / span 2;grid-column:2;padding:8px 12px;font-size:14px}
+.item .owned{grid-row:1 / span 2;grid-column:2;font-size:13px;color:var(--ok);font-weight:700}
+
+/* Pangkat, misi, album */
+.rank{display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.rank-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.rank-top b{font-family:var(--display);font-size:15px}
+.rank-top span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rank .bar i{background:var(--reflect)}
+.bonus{background:var(--reflect);color:#10204a;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px}
+.missions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.missions li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:14px}
+.missions .tick{width:18px;height:18px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;font-size:11px;font-weight:800}
+.missions li.done .tick{background:var(--ok);border-color:var(--ok);color:#10204a}
+.missions li.done{border-color:var(--ok)}
+.missions .rw{font-family:var(--mono);font-size:12px;color:var(--reflect);white-space:nowrap}
+.missions .pg{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.next{margin:0;padding-left:18px;font-size:14px;color:var(--muted)}
+.next b{color:var(--fg)}
+.album{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.album div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.album .sw{width:100%;height:10px;border-radius:4px}
+.album b{font-size:14px}
+.album span{font-size:12px;color:var(--muted)}
+.album .locked{opacity:.55}
 
 .btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 button{
@@ -102,6 +170,7 @@ button{
   border-radius:10px;padding:10px 16px;cursor:pointer;touch-action:manipulation;
 }
 button:hover{border-color:var(--muted)}
+button:disabled{opacity:.5;cursor:not-allowed}
 button.primary{
   background:var(--vest);border-color:var(--vest);color:#1d1205;
   background-image:linear-gradient(180deg,transparent 58%,var(--reflect) 58%,var(--reflect) 72%,transparent 72%);
@@ -109,7 +178,9 @@ button.primary{
 button:focus-visible{outline:3px solid var(--reflect);outline-offset:2px}
 button.ghost{background:transparent}
 .controls{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.hint{font-size:13px;color:var(--muted);flex:1 1 200px;min-width:0}
+#btnGate{position:relative;overflow:hidden;flex:1 1 170px}
+#btnGate .cd{position:absolute;left:0;bottom:0;height:4px;background:var(--reflect);width:0}
+.hint{font-size:13px;color:var(--muted);min-width:0}
 @media (prefers-reduced-motion:reduce){.toast,.bar i{transition:none}}
 </style>
 </head>
@@ -120,7 +191,7 @@ button.ghost{background:transparent}
     <div class="p-sign" aria-hidden="true">P</div>
     <div>
       <h1>Kang Parkir</h1>
-      <p>Jaga parkiran Toko Sinar Jaya dari pagi sampai malam.</p>
+      <p>Atur parkiran, tagih tarifnya, jangan sampai ada yang kabur.</p>
     </div>
   </header>
 
@@ -128,83 +199,131 @@ button.ghost{background:transparent}
     <div class="hud">
       <div class="stat"><span class="k">Hari</span><span class="v" id="hDay">1</span></div>
       <div class="stat"><span class="k">Jam</span><span class="v" id="hClock">06:00</span></div>
+      <div class="stat"><span class="k">Lokasi</span><span class="v" id="hLoc">Toko Sinar Jaya</span></div>
+      <div class="stat"><span class="k">Misi</span><span class="v" id="hMission">0/3</span></div>
       <div class="stat"><span class="k">Komplain</span><span class="v" id="hKomplain">○○○</span></div>
-      <div class="stat"><span class="k">Kabur</span><span class="v" id="hKabur">0</span></div>
       <div class="money">
-        <div class="money-row"><span id="hMoney">Rp0</span><span id="hTarget">Setoran Rp30.000</span></div>
+        <div class="money-row"><span>Pendapatan <span id="hMoney">Rp0</span> <span class="tip" id="hTip">(tip Rp0)</span></span><span id="hTarget">Setoran Rp30.000</span></div>
         <div class="bar"><i id="hBar"></i></div>
       </div>
     </div>
     <div class="stage" id="stage">
-      <canvas id="cv" width="420" height="580" aria-label="Lahan parkir depan toko"></canvas>
+      <canvas id="cv" width="420" height="580" aria-label="Lahan parkir"></canvas>
       <div class="toast" id="toast"></div>
       <div class="overlay" id="overlay">
-        <!-- layar awal -->
-        <div class="card" id="scrStart">
-          <span class="eyebrow">Rompi sudah dipakai, peluit siap</span>
-          <h2>Atur parkiran, tagih Rp2.000, jangan sampai ada yang kabur.</h2>
-          <ol class="steps">
-            <li><b>Seret</b> kendaraan dari jalan ke lajur parkir. Motor ke lajur kecil, mobil ke lajur besar.</li>
-            <li>Tiap lajur seperti tumpukan: yang masuk terakhir harus keluar duluan. Kendaraan di depan menghalangi yang di belakangnya.</li>
-            <li>Saat pemilik kembali, muncul tanda <b>!</b>. <b>Ketuk</b> kendaraannya untuk mengeluarkan dan menagih.</li>
-            <li>Motor yang menghalangi boleh kamu <b>geser</b> ke lajur lain atau trotoar. Mobil tidak bisa digeser.</li>
-            <li>Ada motor yang <b>kabur</b> tanpa bayar. Ketuk cepat sebelum hilang dari layar.</li>
-          </ol>
-          <div class="legend">
-            <span><span class="pill" style="background:#7fe0a4">BENTAR</span> belanja cepat</span>
-            <span><span class="pill" style="background:#ffd166">SEDANG</span></span>
-            <span><span class="pill" style="background:#ff9d8a">LAMA</span> taruh paling dalam</span>
+
+        <!-- BERANDA -->
+        <div class="card" id="scrHome">
+          <span class="eyebrow" id="homeEyebrow">Karier Kang Parkir</span>
+          <h2 id="homeTitle">Rompi sudah dipakai, peluit siap.</h2>
+          <p class="bonus" id="homeBonus" hidden></p>
+          <div class="wallet"><span>Tabungan</span><span class="v" id="homeSaving">Rp0</span></div>
+          <div class="rank">
+            <div class="rank-top"><b id="homeRank">Kang Parkir Magang</b><span id="homeXp">0 XP</span></div>
+            <div class="bar"><i id="homeXpBar"></i></div>
           </div>
-          <p>Tiga komplain dan kamu diusir pemilik toko. Kumpulkan setoran harian sebelum jam 21.00.</p>
-          <div class="btns">
-            <button class="primary" id="btnStart">Mulai kerja</button>
-            <button id="btnFresh" hidden>Mulai dari hari 1</button>
+          <p class="rule" id="homeBest" hidden></p>
+          <details id="howto">
+            <summary>Cara main</summary>
+            <ol class="steps">
+              <li><b>Seret</b> kendaraan dari jalan ke lajur. Motor ke lajur kecil atau trotoar, mobil ke lajur besar.</li>
+              <li>Tiap lajur seperti tumpukan: yang masuk terakhir harus keluar duluan.</li>
+              <li>Label <span class="pill" style="background:#7fe0a4">BENTAR</span> <span class="pill" style="background:#ffd166">SEDANG</span> <span class="pill" style="background:#ff9d8a">LAMA</span> menunjukkan lama belanja. Taruh yang lama paling dalam.</li>
+              <li>Saat tanda <b>!</b> muncul, <b>ketuk</b> kendaraannya untuk menagih. Makin cepat, makin besar tipnya. Tiga layanan cepat berturut-turut memberi bonus <b>Prima</b>.</li>
+              <li>Motor yang menghalangi bisa <b>digeser</b>. Mobil tidak bisa.</li>
+              <li>Motor <b>kabur</b>? Ketuk sebelum hilang dari layar.</li>
+              <li>Tekan <b>Tutup palang</b> untuk menahan kendaraan baru sebentar saat parkiran penuh.</li>
+            </ol>
+          </details>
+          <div class="actions">
+            <button class="primary" id="btnHomePlay">Siapkan hari 1</button>
+            <button id="btnHomeShop">Warung</button>
+            <button id="btnHomeAlbum">Album 0/6</button>
           </div>
-          <p class="hint" id="bestLine" hidden></p>
         </div>
-        <!-- pembuka hari -->
-        <div class="card" id="scrIntro" hidden>
-          <span class="eyebrow" id="introEyebrow">Hari 1</span>
-          <h2 id="introTitle">Hari pertama.</h2>
-          <p id="introText"></p>
-          <div class="btns"><button class="primary" id="btnGo">Buka parkiran</button></div>
+
+        <!-- ALBUM -->
+        <div class="card" id="scrAlbum" hidden>
+          <span class="eyebrow">Album pelanggan spesial</span>
+          <h2 id="albumTitle">Kendaraan langka yang pernah kamu layani.</h2>
+          <p class="rule">Pelanggan spesial muncul acak mulai hari 2, ditandai bintang. Mereka tidak pernah kabur dan tipnya besar.</p>
+          <div class="album" id="albumGrid"></div>
+          <div class="actions"><button class="primary" id="btnAlbumBack">Kembali</button></div>
         </div>
-        <!-- akhir hari -->
+
+        <!-- PERSIAPAN HARI -->
+        <div class="card" id="scrPrep" hidden>
+          <span class="eyebrow" id="prepEyebrow">Hari 1</span>
+          <h2 id="prepTitle">Mau jaga di mana hari ini?</h2>
+          <div class="choices" id="locChoices"></div>
+          <h3>Tarif hari ini</h3>
+          <div class="choices cols3" id="tarifChoices"></div>
+          <h3>Misi hari ini</h3>
+          <ul class="missions" id="prepMissions"></ul>
+          <h3>Prakiraan</h3>
+          <ul class="forecast" id="forecast"></ul>
+          <p class="rule" id="prepRule"></p>
+          <div class="actions">
+            <button class="primary" id="btnGo">Buka parkiran</button>
+            <button id="btnPrepShop">Warung</button>
+          </div>
+        </div>
+
+        <!-- AKHIR HARI -->
         <div class="card" id="scrEnd" hidden>
           <span class="eyebrow" id="endEyebrow">Hari 1 selesai</span>
           <h2 id="endTitle">Setoran aman.</h2>
           <p class="verdict" id="endVerdict"></p>
-          <div class="stats">
-            <div><span class="k">Pendapatan</span><span class="v" id="eMoney">Rp0</span></div>
-            <div><span class="k">Setoran</span><span class="v" id="eTarget">Rp0</span></div>
-            <div><span class="k">Dilayani</span><span class="v" id="eServed">0</span></div>
-            <div><span class="k">Tip</span><span class="v" id="eTips">Rp0</span></div>
-            <div><span class="k">Kabur tertangkap</span><span class="v" id="eCaught">0</span></div>
-            <div><span class="k">Lolos tanpa bayar</span><span class="v" id="eLost">0</span></div>
-          </div>
-          <p class="share" id="eShare"></p>
-          <div class="btns">
+          <p class="bonus" id="endRankUp" hidden></p>
+          <div class="nota" id="nota"></div>
+          <ul class="missions" id="endMissions"></ul>
+          <div class="mini" id="endMini"></div>
+          <h3>Selanjutnya</h3>
+          <ul class="next" id="endNext"></ul>
+          <div class="actions">
             <button class="primary" id="btnNext">Lanjut</button>
-            <button id="btnCopy">Salin hasil</button>
+            <button id="btnEndShop">Warung</button>
+            <button class="ghost" id="btnCopy">Salin hasil</button>
           </div>
         </div>
-        <!-- jeda -->
+
+        <!-- WARUNG -->
+        <div class="card" id="scrShop" hidden>
+          <span class="eyebrow">Warung Bu Tini</span>
+          <h2>Belanja pakai tabungan.</h2>
+          <div class="wallet"><span>Tabungan</span><span class="v" id="shopSaving">Rp0</span></div>
+          <h3>Peralatan</h3>
+          <div class="items" id="shopGear"></div>
+          <h3>Gaya</h3>
+          <p class="rule">Hanya tampilan, tidak mengubah permainan.</p>
+          <div class="items" id="shopStyle"></div>
+          <div class="actions">
+            <button class="primary" id="btnShopBack">Kembali</button>
+          </div>
+        </div>
+
+        <!-- JEDA -->
         <div class="card" id="scrPause" hidden>
           <h2>Istirahat dulu.</h2>
-          <p>Parkiran ditinggal sebentar. Waktu berhenti sampai kamu kembali.</p>
-          <div class="btns"><button class="primary" id="btnResume">Lanjut jaga</button></div>
+          <p>Waktu berhenti sampai kamu kembali.</p>
+          <ul class="missions" id="pauseMissions"></ul>
+          <div class="actions">
+            <button class="primary" id="btnResume">Lanjut jaga</button>
+            <button class="ghost" id="btnGiveUp">Pulang (hari dianggap gagal)</button>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <div class="controls">
-    <span class="hint" id="hint">Seret kendaraan di jalan ke lajur parkir.</span>
+    <button id="btnGate" disabled><span id="gateLabel">Tutup palang</span><i class="cd" id="gateCd"></i></button>
     <div class="btns">
       <button class="ghost" id="btnPause">Jeda</button>
-      <button class="ghost" id="btnMute" aria-pressed="false">Suara: nyala</button>
+      <button class="ghost" id="btnMute" aria-pressed="false">Suara</button>
     </div>
   </div>
+  <p class="hint" id="hint">Seret kendaraan di jalan ke lajur parkir.</p>
 </div>
 
 <script>
@@ -212,34 +331,96 @@ button.ghost{background:transparent}
 'use strict';
 const W=420,H=580,DAY_LEN=120;
 const AISLE_Y=362,LANE1=486,LANE2=548;
+const MEAL=5000,FINE_PER=5000,GATE_LEN=8;
 const $=id=>document.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d');
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
+const fmt=n=>(n<0?'−':'')+'Rp'+Math.abs(Math.round(n)).toLocaleString('id-ID');
+const rand=(a,b)=>a+Math.random()*(b-a);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /* ---------- penyimpanan ---------- */
 const store={
   get(k,d){try{const v=localStorage.getItem('kangparkir:'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
   set(k,v){try{localStorage.setItem('kangparkir:'+k,JSON.stringify(v));}catch(e){}}
 };
+function freshSave(){
+  return {day:1,saving:0,gear:{},style:{rompi:'oranye',topi:'none',payung:'biru'},owned:['rompi:oranye','topi:none','payung:biru'],loc:'toko',tarif:'normal',best:null,
+    xp:0,album:{},coffee:{last:'',count:0}};
+}
+let save=store.get('save2',null);
+if(!save){save=freshSave();const old=store.get('progress',null);if(old&&old.day)save.day=old.day;}
+else save=Object.assign(freshSave(),save);
+const persist=()=>store.set('save2',save);
 
 /* ---------- data ---------- */
 const TYPES={
-  motor:   {len:46,wid:22,pay:2000, shop:[8,22], pat:9, qpat:16,fits:'motor',name:'Motor'},
-  ojol:    {len:46,wid:22,pay:2000, shop:[3,6],  pat:6, qpat:12,fits:'motor',name:'Ojol'},
-  mobil:   {len:84,wid:44,pay:5000, shop:[12,26],pat:9, qpat:16,fits:'car',  name:'Mobil'},
-  fortuner:{len:90,wid:50,pay:10000,shop:[9,16], pat:5, qpat:10,fits:'car',  name:'Fortuner'}
+  motor:   {len:46,wid:22,shop:[8,22], pat:9, qpat:16,fits:'motor',name:'Motor'},
+  ojol:    {len:46,wid:22,shop:[3,6],  pat:6, qpat:12,fits:'motor',name:'Ojol'},
+  mobil:   {len:84,wid:44,shop:[12,26],pat:9, qpat:16,fits:'car',  name:'Mobil'},
+  fortuner:{len:90,wid:50,shop:[9,16], pat:5, qpat:10,fits:'car',  name:'Fortuner'}
 };
+const TARIF={
+  murah: {label:'Murah', motor:1000,mobil:3000,fortuner:6000, pat:1.25,kabur:.5,rate:1.15,desc:'Pelanggan lebih sabar dan lebih ramai, jarang ada yang kabur.'},
+  normal:{label:'Normal',motor:2000,mobil:5000,fortuner:10000,pat:1,  kabur:1, rate:1,   desc:'Tarif biasa.'},
+  mahal: {label:'Mahal', motor:3000,mobil:7000,fortuner:15000,pat:.8, kabur:1.8,rate:.85,desc:'Untung besar, tapi pelanggan gak sabaran dan lebih sering kabur.'}
+};
+const LOCS=[
+  {id:'toko',  name:'Toko Sinar Jaya',sign:'TOKO SINAR JAYA · 24 JAM',signColor:'#1f7a4d',motors:5,cars:2,unlock:1,mult:1,
+   desc:'Motor dan mobil. Ramai pagi dan sore.'},
+  {id:'pasar', name:'Pasar Pagi Sukamaju',sign:'PASAR PAGI SUKAMAJU',signColor:'#a8461c',motors:7,cars:1,unlock:5,mult:1.15,
+   desc:'Hampir semua motor, belanjanya cepat. Super ramai pagi, sepi setelah jam 2.'},
+  {id:'masjid',name:'Masjid Raya Al-Ikhlas',sign:'MASJID RAYA AL-IKHLAS',signColor:'#16616b',motors:3,cars:3,unlock:8,mult:1.25,
+   desc:'Tenang, lalu semua datang jelang salat Jumat dan keluar hampir bersamaan.'}
+];
+const GEAR=[
+  {id:'peluit', name:'Peluit Nyaring', price:15000,desc:'Motor yang kabur melaju 35% lebih lambat.'},
+  {id:'rompi',  name:'Rompi Reflektor',price:20000,desc:'Pelanggan 15% lebih sabar.'},
+  {id:'papan',  name:'Papan Tarif Resmi',price:25000,desc:'Peluang motor kabur turun setengah.'},
+  {id:'palang', name:'Palang Pintu',   price:30000,desc:'Tutup palang bisa dipakai lagi lebih cepat (30 → 18 detik).'},
+  {id:'trotoar',name:'Izin Trotoar',   price:35000,desc:'Tambah satu tempat parkir motor di trotoar.'},
+  {id:'magang', name:'Anak Magang',    price:60000,desc:'Tiap 4 detik mengeluarkan satu kendaraan siap yang tidak terhalang. Tanpa tip.'}
+];
+const STYLE=[
+  {slot:'rompi', id:'oranye', name:'Rompi oranye', price:0,    color:'#ff7a1a'},
+  {slot:'rompi', id:'stabilo',name:'Rompi hijau stabilo',price:5000,color:'#9be22d'},
+  {slot:'rompi', id:'pink',   name:'Rompi pink',   price:5000, color:'#ff5fa2'},
+  {slot:'topi',  id:'none',   name:'Tanpa topi',   price:0},
+  {slot:'topi',  id:'caping', name:'Caping',       price:4000},
+  {slot:'topi',  id:'peci',   name:'Peci hitam',   price:4000},
+  {slot:'payung',id:'biru',   name:'Payung pos biru',price:0, colors:['#2c6fd1','#f6f7fb']},
+  {slot:'payung',id:'merahputih',name:'Payung merah putih',price:6000,colors:['#d7263d','#f6f7fb']},
+  {slot:'payung',id:'pelangi',name:'Payung pelangi',price:6000,colors:['#d7263d','#f4d35e','#1b998b','#2e86ab']}
+];
 const MOTOR_COLORS=['#d7263d','#1b998b','#f4d35e','#2e86ab','#e8e8e8','#222428','#8e44ad','#f08a24'];
 const CAR_COLORS=['#e8e8e8','#c0c4cc','#9a2c2c','#2c4f9a','#3d3f45','#b8a07a'];
 const CAT={bentar:{label:'BENTAR',color:'#7fe0a4'},sedang:{label:'SEDANG',color:'#ffd166'},lama:{label:'LAMA',color:'#ff9d8a'}};
-const target=d=>d<=4?[30000,50000,70000,90000][d-1]:90000+(d-4)*15000;
-const INTRO={
-  1:['Hari pertama jadi Kang Parkir.','Hari ini cuma motor. Taruh motor yang belanjanya lama di posisi paling dalam.'],
-  2:['Mobil mulai datang.','Mobil bayar Rp5.000, tapi tidak bisa kamu geser. Pikirkan urutan masuknya. Hati-hati juga, ada motor yang suka kabur tanpa bayar.'],
-  3:['Ojol mampir.','Ojol cuma sebentar, jadi taruh di depan lajur. Kalau ditaruh paling dalam, dia bakal keblokir.'],
-  4:['Fortuner datang.','Bayarnya Rp10.000, tapi pemiliknya gak sabaran dan maunya keluar duluan. Jangan sampai ada mobil yang menghalanginya.']
-};
+const RANKS=[[0,'Kang Parkir Magang'],[60,'Kang Parkir'],[180,'Juru Parkir Senior'],[400,'Koordinator Parkir'],[750,'Raja Parkir Kecamatan'],[1300,'Legenda Parkir Nusantara']];
+const rankIdx=xp=>RANKS.reduce((i,[t],k)=>xp>=t?k:i,0);
+const SPECIALS=[
+  {id:'vespa',    name:'Vespa Antik',     fits:'motor',color:'#9ad1c2',desc:'Dirawat sejak 1978.'},
+  {id:'modif',    name:'Motor Modif',     fits:'motor',color:'#39ff14',desc:'Knalpotnya bikin kaget satu gang.'},
+  {id:'turis',    name:'Turis Sewa Motor',fits:'motor',color:'#ffffff',desc:'Gak ngerti tarif, tapi tipnya besar.'},
+  {id:'juragan',  name:'Mobil Juragan',   fits:'car',  color:'#d4af37',desc:'Juragan beras. Tipnya selalu bulat.'},
+  {id:'pengantin',name:'Mobil Pengantin', fits:'car',  color:'#f7f3ee',desc:'Penuh bunga, buru-buru ke gedung.'},
+  {id:'pikap',    name:'Pikap Sayur',     fits:'car',  color:'#3f8f4f',desc:'Bawa sayur segar dari dataran tinggi.'}
+];
+const SPECIAL_TIPS=[3000,5000,5000,10000,10000,20000];
+const MISSIONS=[
+  {id:'serve',     minDay:1,n:d=>10+Math.min(20,d*2),            text:n=>`Layani ${n} kendaraan`,         get:s=>s.served,     reward:4000},
+  {id:'prima',     minDay:1,n:d=>Math.min(8,3+Math.floor(d/3)),  text:n=>`Capai Pelayanan Prima x${n}`,   get:s=>s.bestStreak, reward:5000},
+  {id:'tips',      minDay:1,n:d=>Math.min(30000,4000+d*1500),    text:n=>`Kumpulkan tip ${fmt(n)}`,       get:s=>s.tips,       reward:4000},
+  {id:'nokomplain',minDay:1,n:()=>1,                             text:()=>'Tutup hari tanpa komplain',     get:s=>s.clock>=DAY_LEN&&s.komplain===0?1:0,endOnly:true,reward:6000},
+  {id:'kabur',     minDay:2,n:d=>Math.min(4,1+Math.floor(d/4)),  text:n=>`Tangkap ${n} motor kabur`,      get:s=>s.caught,     reward:5000},
+  {id:'mobil',     minDay:2,n:d=>Math.min(15,3+d),               text:n=>`Layani ${n} mobil`,             get:s=>s.carsServed, reward:4000},
+  {id:'spesial',   minDay:2,n:()=>1,                             text:()=>'Layani satu pelanggan spesial', get:s=>s.special,    reward:5000}
+];
+const missionDef=id=>MISSIONS.find(m=>m.id===id);
+const baseTarget=d=>d<=4?[30000,50000,70000,90000][d-1]:90000+(d-4)*8000;
+const targetFor=(d,loc)=>Math.round(baseTarget(d)*loc.mult/1000)*1000;
+const locById=id=>LOCS.find(l=>l.id===id)||LOCS[0];
+const unlocked=l=>save.day>=l.unlock;
+const has=g=>!!save.gear[g];
 
 /* ---------- audio ---------- */
 let AC=null,muted=false;
@@ -258,64 +439,114 @@ function tone(f,dur,type,vol,t0,fEnd,vib){
 }
 const sfx={
   whistle(){tone(2900,.1,'sine',.16,0,0,32);tone(2900,.32,'sine',.18,.14,0,32);},
-  coin(){tone(1046,.07,'square',.07);tone(1568,.14,'square',.07,.07);},
+  coin(big){tone(1046,.07,'square',.07);tone(1568,.14,'square',.07,.07);if(big)tone(2093,.16,'square',.06,.16);},
   drop(){tone(180,.07,'triangle',.25,0,110);},
   horn(){tone(392,.32,'sawtooth',.09);tone(494,.32,'sawtooth',.07);},
   nope(){tone(220,.09,'square',.06);tone(196,.12,'square',.06,.1);},
-  engine(){tone(70,.35,'sawtooth',.06,0,110);}
+  engine(){tone(70,.35,'sawtooth',.06,0,110);},
+  gate(){tone(330,.12,'triangle',.18);tone(262,.18,'triangle',.18,.1);},
+  siren(){for(let i=0;i<3;i++){tone(700,.22,'sine',.08,i*.45,1000);tone(1000,.22,'sine',.08,i*.45+.22,700);}}
 };
 
 /* ---------- lajur ---------- */
-function makeCols(){
-  const cols=[];
-  [33,79,125,171,217].forEach((x,i)=>cols.push({kind:'motor',x,w:42,top:112,h:216,depth:3,stack:[],label:'M'+(i+1)}));
-  [289,373].forEach((x,i)=>cols.push({kind:'car',x,w:78,top:112,h:216,depth:2,stack:[],label:'B'+(i+1)}));
-  [40,94].forEach((x,i)=>cols.push({kind:'trot',x,w:48,top:396,h:50,depth:1,stack:[],label:'T'+(i+1)}));
+function makeCols(loc){
+  const cols=[],gap=4,mw=42,cw=78;
+  const total=loc.motors*mw+loc.cars*cw+(loc.motors+loc.cars-1)*gap;
+  let x=(W-total)/2;
+  for(let i=0;i<loc.motors;i++){cols.push({kind:'motor',x:x+mw/2,w:mw,top:112,h:216,depth:3,stack:[]});x+=mw+gap;}
+  for(let i=0;i<loc.cars;i++){cols.push({kind:'car',x:x+cw/2,w:cw,top:112,h:216,depth:2,stack:[]});x+=cw+gap;}
+  const trot=2+(has('trotoar')?1:0);
+  for(let i=0;i<trot;i++)cols.push({kind:'trot',x:40+i*54,w:48,top:396,h:50,depth:1,stack:[]});
   return cols;
 }
 const slotY=(c,i)=>c.top+(i+.5)*c.h/c.depth;
 const accepts=(c,v)=>(v.T.fits==='car')?c.kind==='car':(c.kind==='motor'||c.kind==='trot');
 const isTop=v=>v.col&&v.col.stack[v.col.stack.length-1]===v;
 
+/* ---------- waktu ---------- */
+const hourOf=t=>6+t/DAY_LEN*15;
+const clockAt=h=>(h-6)/15*DAY_LEN;
+function clockStr(t){const h=hourOf(t),hh=Math.floor(h),mm=Math.floor((h-hh)*60);return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
+
 /* ---------- state ---------- */
-let S=null,phase='start',paused=false,nextId=1;
-let progress=store.get('progress',{day:1,best:null});
+let S=null,phase='home',paused=false,nextId=1,returnTo='home';
+let plan=null; // rencana hari: lokasi, tarif, kejadian
 
-function newDay(day){
-  return {day,clock:0,money:0,target:target(day),komplain:0,caught:0,lost:0,tips:0,served:0,left:0,
-    vehicles:[],queue:[],cols:makeCols(),spawnT:1.2,floaters:[],whistleT:0,shakeT:0};
-}
-
-function weights(d){
-  if(d===1)return [['motor',1]];
-  if(d===2)return [['motor',.65],['mobil',.35]];
-  if(d===3)return [['motor',.5],['ojol',.2],['mobil',.3]];
-  return [['motor',.45],['ojol',.2],['mobil',.25],['fortuner',.1]];
-}
-function pickType(d){
-  const w=weights(d);let r=Math.random();
-  for(const [t,p] of w){if((r-=p)<=0)return t;}
-  return w[0][0];
-}
-function rand(a,b){return a+Math.random()*(b-a);}
-
-function queueLength(){return S.queue.reduce((s,v)=>s+v.T.len+12,0);}
-
-function spawn(){
-  const type=pickType(S.day),T=TYPES[type];
-  if(queueLength()+T.len>392){
-    S.left++;toast('Antrean penuh. Ada pengendara yang lewat.');return;
+function planDay(day){
+  const loc=unlocked(locById(save.loc))?locById(save.loc):LOCS[0];
+  const tarif=TARIF[save.tarif]?save.tarif:'normal';
+  const events=[];
+  if(day>=3){
+    const n=day>=6?(Math.random()<.5?2:1):(Math.random()<.6?1:0);
+    const pool=['hujan','satpol','rombongan'].sort(()=>Math.random()-.5).slice(0,n);
+    for(const type of pool){
+      if(type==='hujan')events.push({type,start:15,end:18});
+      if(type==='satpol')events.push({type,hour:Math.floor(rand(9,19)),done:false,warned:false});
+      if(type==='rombongan')events.push({type,hour:Math.floor(rand(8,17)),done:false});
+    }
   }
-  const scale=Math.max(.7,1-.05*(S.day-1));
-  const shop=rand(T.shop[0],T.shop[1]);
-  const v={
-    id:nextId++,type,T,color:(T.fits==='car'?(type==='fortuner'?'#17181c':CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)]):MOTOR_COLORS[Math.floor(Math.random()*MOTOR_COLORS.length)]),
+  const missions=MISSIONS.filter(m=>day>=m.minDay).sort(()=>Math.random()-.5).slice(0,3).map(m=>({id:m.id,n:m.n(day),done:false}));
+  return {day,loc,tarif,events,missions};
+}
+
+function newDay(p){
+  return {day:p.day,loc:p.loc,tarif:p.tarif,T:TARIF[p.tarif],events:p.events,
+    clock:0,fares:0,tips:0,fines:0,target:targetFor(p.day,p.loc),
+    komplain:0,caught:0,lost:0,served:0,left:0,streak:0,bestStreak:0,carsServed:0,special:0,xp:0,
+    missions:(p.missions||[]).map(m=>({...m,done:false})),
+    vehicles:[],queue:[],cols:makeCols(p.loc),spawnT:1.2,floaters:[],whistleT:0,shakeT:0,
+    gateT:0,gateCd:0,internT:4,banner:null};
+}
+
+function weights(){
+  const d=S.day,id=S.loc.id,rain=raining();
+  let w;
+  if(id==='pasar')w=d>=2?[['motor',.6],['ojol',.3],['mobil',.1]]:[['motor',.7],['ojol',.3]];
+  else if(id==='masjid')w=[['motor',.55],['mobil',.4],['fortuner',d>=4?.05:0]];
+  else if(d===1)w=[['motor',1]];
+  else if(d===2)w=[['motor',.65],['mobil',.35]];
+  else if(d===3)w=[['motor',.5],['ojol',.2],['mobil',.3]];
+  else w=[['motor',.42],['ojol',.2],['mobil',.26],['fortuner',d>=10?.15:.1]];
+  if(rain)w=w.map(([t,p])=>[t,t==='ojol'?p*2.2:p]);
+  const sum=w.reduce((s,x)=>s+x[1],0);
+  return w.map(([t,p])=>[t,p/sum]);
+}
+function pickType(){let r=Math.random();const w=weights();for(const [t,p] of w){if((r-=p)<=0)return t;}return w[0][0];}
+function raining(){const h=hourOf(S.clock);return S.events.some(e=>e.type==='hujan'&&h>=e.start&&h<e.end);}
+
+function profileFactor(h){
+  const id=S.loc.id;
+  if(id==='pasar')return h<10?.5:h<14?1:2.2;
+  if(id==='masjid')return h<11?1.6:h<12?.28:h<15?1.8:1.1;
+  return (h>=7&&h<9)||(h>=16&&h<18.5)?.6:1;
+}
+
+const queueLength=()=>S.queue.reduce((s,v)=>s+v.T.len+12,0);
+
+function spawn(forceType){
+  const type=forceType||pickType(),T=TYPES[type];
+  if(queueLength()+T.len>392){S.left++;toast('Antrean penuh. Ada pengendara yang lewat.');return false;}
+  const scale=Math.max(.6,1-.04*(S.day-1))*S.T.pat*(has('rompi')?1.15:1);
+  const h=hourOf(S.clock);
+  let shop=rand(T.shop[0],T.shop[1]);
+  if(S.loc.id==='pasar')shop*=.7;
+  if(raining())shop*=1.4;
+  // jelang Jumatan: semua keluar sekitar jam 13
+  if(S.loc.id==='masjid'&&h>=11&&h<12.3)shop=Math.max(4,clockAt(13+rand(0,.35))-S.clock);
+  const kaburP=T.fits==='motor'&&S.day>=2?.2*S.T.kabur*(has('papan')?.5:1):0;
+  const specialPool=SPECIALS.filter(s=>s.fits===T.fits);
+  const special=S.day>=2&&Math.random()<.07?specialPool[Math.floor(Math.random()*specialPool.length)]:null;
+  const v={special,
+    id:nextId++,type,T,pay:S.T[type==='ojol'?'motor':type],
+    color:T.fits==='car'?(type==='fortuner'?'#17181c':CAR_COLORS[Math.floor(Math.random()*CAR_COLORS.length)]):MOTOR_COLORS[Math.floor(Math.random()*MOTOR_COLORS.length)],
     x:-60,y:LANE1,a:0,state:'queue',col:null,path:[],speed:240,
     shop,cat:shop<=8?'bentar':shop<=16?'sedang':'lama',
     qpatMax:T.qpat*scale,qpat:T.qpat*scale,patMax:T.pat*scale,pat:0,
-    kabur:(T.fits==='motor'&&S.day>=2&&Math.random()<.2),caught:false,readyAt:0,shake:0,dragged:false,rider:true
+    kabur:!special&&Math.random()<kaburP,caught:false,readyAt:0,shake:0,dragged:false,rider:true,byIntern:false
   };
+  if(special)v.color=special.color;
   S.vehicles.push(v);S.queue.push(v);
+  return true;
 }
 
 function layoutQueue(){
@@ -334,39 +565,99 @@ function place(v,col){
   sfx.drop();
 }
 
-function exitVehicle(v){
+function exitVehicle(v,byIntern){
   const c=v.col;c.stack.pop();v.col=null;
-  v.state='exiting';v.rider=true;
+  v.state='exiting';v.rider=true;v.byIntern=!!byIntern;
   v.path=[{x:c.x,y:c.kind==='trot'?AISLE_Y+6:AISLE_Y,rev:true},{x:404,y:AISLE_Y},{x:404,y:LANE2},{x:-100,y:LANE2}];
-  S.whistleT=.6;sfx.whistle();sfx.engine();
+  if(!byIntern){S.whistleT=.6;sfx.whistle();}
+  sfx.engine();
   if(v.kabur){
-    v.speed=400;
+    v.speed=has('peluit')?260:400;
     toast('Motor itu kabur! Ketuk sebelum hilang!');
   }else{
-    v.speed=260;pay(v,true);
+    v.speed=260;collect(v,!byIntern);
   }
 }
 
-function pay(v,allowTip){
-  let amt=v.T.pay,txt='+'+fmt(amt);
-  if(allowTip&&S.clock-v.readyAt<2.5){amt+=1000;S.tips+=1000;txt+=' · Makasih, Bang!';}
-  S.money+=amt;S.served++;
-  S.floaters.push({x:v.x,y:v.y-30,t:0,txt,color:'#4fd18b'});
-  sfx.coin();
+/* Tagihan: tarif + tip kecepatan + bonus Prima untuk layanan cepat beruntun */
+function collect(v,withTip){
+  let tip=0,label='';
+  if(withTip){
+    const wait=S.clock-v.readyAt;
+    tip=wait<1.5?2000:wait<3?1000:0;
+    if(tip>0){
+      S.streak++;S.bestStreak=Math.max(S.bestStreak,S.streak);
+      if(S.streak>=3){tip+=500*Math.min(4,S.streak-2);label=' · Prima x'+S.streak;}
+      else label=' · Makasih, Bang!';
+    }else S.streak=0;
+  }
+  if(v.special){
+    const bonus=SPECIAL_TIPS[Math.floor(Math.random()*SPECIAL_TIPS.length)];
+    tip+=bonus;S.special++;
+    label=' · '+v.special.name+' kasih '+fmt(bonus)+'!';
+    if(!save.album[v.special.id]){save.album[v.special.id]=true;persist();setTimeout(()=>toast('Baru di album: '+v.special.name+'!'),900);}
+  }
+  if(v.T.fits==='car')S.carsServed++;
+  S.xp+=v.T.fits==='car'?2:1;
+  S.fares+=v.pay;S.tips+=tip;S.served++;
+  S.floaters.push({x:v.x,y:v.y-30,t:0,txt:'+'+fmt(v.pay+tip)+label,color:v.special?'#ffd166':tip?'#e6f25a':'#4fd18b'});
+  sfx.coin(tip>=2000);
+}
+
+function checkMissions(final){
+  for(const m of S.missions){
+    if(m.done)continue;
+    const def=missionDef(m.id);
+    if(def.endOnly&&!final)continue;
+    if(def.get(S)>=m.n){
+      m.done=true;
+      if(!final){toast('Misi selesai: '+def.text(m.n)+' (+'+fmt(def.reward)+')');sfx.coin(true);}
+    }
+  }
 }
 
 /* ---------- update ---------- */
-function hourOf(t){return 6+t/DAY_LEN*15;}
-function clockStr(t){const h=hourOf(t),hh=Math.floor(h),mm=Math.floor((h-hh)*60);return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
-
 function update(dt){
   S.clock+=dt;
   if(S.clock>=DAY_LEN){endDay('time');return;}
-  const hr=hourOf(S.clock);
-  const rush=(hr>=7&&hr<9)||(hr>=16&&hr<18.5);
+  const h=hourOf(S.clock);
+
+  if(S.gateT>0){S.gateT-=dt;if(S.gateT<=0)toast('Palang dibuka lagi.');}
+  if(S.gateCd>0)S.gateCd-=dt;
   S.spawnT-=dt;
-  if(S.spawnT<=0){S.spawnT=Math.max(1.7,5.2-.45*(S.day-1))*(rush?.6:1)*rand(.8,1.2);spawn();}
+  if(S.spawnT<=0){
+    const base=Math.max(1.4,5.2-.42*(Math.min(S.day,10)-1));
+    S.spawnT=base*profileFactor(h)/S.T.rate*rand(.8,1.2);
+    if(S.gateT<=0)spawn();
+  }
+
+  for(const e of S.events){
+    if(e.type==='satpol'&&!e.done){
+      const at=clockAt(e.hour),left=at-S.clock;
+      if(left<=10&&!e.warned){e.warned=true;sfx.siren();toast('Satpol PP patroli! Kosongkan trotoar dalam 10 detik.');}
+      if(e.warned)S.banner={text:'SATPOL PP '+Math.max(0,Math.ceil(left))+' DETIK LAGI · KOSONGKAN TROTOAR',color:'#ff5a4f'};
+      if(left<=0){
+        e.done=true;S.banner=null;
+        const n=S.cols.filter(c=>c.kind==='trot').reduce((s,c)=>s+c.stack.length,0);
+        if(n){S.fines+=n*FINE_PER;S.streak=0;toast('Kena denda '+fmt(n*FINE_PER)+' karena parkir di trotoar.');sfx.horn();}
+        else toast('Trotoar bersih. Satpol PP lewat saja.');
+      }
+    }
+    if(e.type==='rombongan'&&!e.done&&S.clock>=clockAt(e.hour)&&S.gateT<=0){
+      e.done=true;let k=0;for(let i=0;i<5;i++)if(spawn('motor'))k++;
+      if(k)toast('Rombongan arisan datang! '+k+' motor sekaligus.');
+    }
+  }
   layoutQueue();
+
+  if(has('magang')){
+    S.internT-=dt;
+    if(S.internT<=0){
+      S.internT=4;
+      const r=S.vehicles.filter(v=>v.state==='ready'&&isTop(v)).sort((a,b)=>a.pat-b.pat)[0];
+      if(r)exitVehicle(r,true);
+    }
+  }
 
   for(const v of S.vehicles){
     if(v.shake>0)v.shake-=dt;
@@ -382,21 +673,22 @@ function update(dt){
     }else if(v.state==='ready'){
       v.pat-=dt;
       if(v.pat<=0){
-        S.komplain++;v.pat=v.patMax;v.shake=.6;S.shakeT=.35;sfx.horn();
-        try{navigator.vibrate&&navigator.vibrate(180);}catch(e){}
+        S.komplain++;S.streak=0;v.pat=v.patMax;v.shake=.6;S.shakeT=.35;sfx.horn();
+        buzz(180);
         toast(v.T.name+' kelamaan keblokir. Pemiliknya komplain ke bos!');
         if(S.komplain>=3){endDay('fired');return;}
       }
     }
     if(!v.dragged)move(v,dt);
     if((v.state==='exiting'||v.state==='leaving')&&!v.path.length){
-      if(v.state==='exiting'&&v.kabur&&!v.caught){S.lost++;toast('Yah, kabur tanpa bayar.');}
+      if(v.state==='exiting'&&v.kabur&&!v.caught){S.lost++;S.streak=0;toast('Yah, kabur tanpa bayar.');}
       v.state='gone';
     }
   }
   S.vehicles=S.vehicles.filter(v=>v.state!=='gone');
+  checkMissions(false);
   for(const f of S.floaters)f.t+=dt;
-  S.floaters=S.floaters.filter(f=>f.t<1.2);
+  S.floaters=S.floaters.filter(f=>f.t<1.3);
   if(S.whistleT>0)S.whistleT-=dt;
   if(S.shakeT>0)S.shakeT-=dt;
 }
@@ -417,7 +709,7 @@ function move(v,dt){
 let SC=1;
 function fit(){
   const r=cv.parentElement.getBoundingClientRect();
-  const avail=window.innerHeight-200;
+  const avail=window.innerHeight-230;
   const w=Math.max(260,Math.min(r.width||W,avail*W/H));
   $('game').style.maxWidth=Math.round(w)+'px';
   const cw=cv.getBoundingClientRect().width||w;
@@ -428,47 +720,64 @@ addEventListener('resize',fit);
 
 function rrect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 
-function drawScene(){
-  // toko
-  ctx.fillStyle='#d9d2c3';ctx.fillRect(0,0,W,100);
-  ctx.fillStyle='#b9b0a0';ctx.fillRect(0,0,W,18);
-  ctx.fillStyle='#1f7a4d';rrect(70,24,280,30,6);ctx.fill();
-  ctx.fillStyle='#ffffff';ctx.font='800 15px Poppins, system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('TOKO SINAR JAYA · 24 JAM',210,40);
-  ctx.fillStyle='#7fb3d5';ctx.fillRect(20,62,380,32);
-  ctx.fillStyle='#5b8fb3';for(let x=20;x<400;x+=38)ctx.fillRect(x,62,2,32);
-  ctx.fillStyle='#3d3f45';ctx.fillRect(186,62,48,38);
+function drawBuilding(){
+  const loc=S.loc;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  if(loc.id==='pasar'){
+    ctx.fillStyle='#cfc5b0';ctx.fillRect(0,0,W,100);
+    const tarps=['#d7263d','#2e86ab','#f4d35e','#1b998b','#f08a24','#8e44ad'];
+    for(let i=0;i<7;i++){ctx.fillStyle=tarps[i%tarps.length];ctx.fillRect(i*60,58,58,36);ctx.fillStyle='rgba(255,255,255,.35)';for(let s=0;s<58;s+=14)ctx.fillRect(i*60+s,58,7,36);}
+  }else if(loc.id==='masjid'){
+    ctx.fillStyle='#e8efe9';ctx.fillRect(0,0,W,100);
+    ctx.fillStyle='#16616b';ctx.beginPath();ctx.arc(210,92,46,Math.PI,0);ctx.fill();
+    ctx.fillStyle='#d9c27a';ctx.beginPath();ctx.arc(210,42,5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#cfd9d2';ctx.fillRect(40,20,14,80);ctx.fillRect(366,20,14,80);
+  }else{
+    ctx.fillStyle='#d9d2c3';ctx.fillRect(0,0,W,100);
+    ctx.fillStyle='#b9b0a0';ctx.fillRect(0,0,W,18);
+    ctx.fillStyle='#7fb3d5';ctx.fillRect(20,62,380,32);
+    ctx.fillStyle='#5b8fb3';for(let x=20;x<400;x+=38)ctx.fillRect(x,62,2,32);
+    ctx.fillStyle='#3d3f45';ctx.fillRect(186,62,48,38);
+  }
+  ctx.fillStyle=loc.signColor;rrect(60,22,300,30,6);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.font='800 14px Poppins, system-ui, sans-serif';
+  ctx.fillText(loc.sign,210,38);
   ctx.fillStyle='#e9e4da';ctx.fillRect(0,100,W,8);
+}
 
-  // lahan
+function drawScene(){
+  drawBuilding();
   ctx.fillStyle='#4a4d52';ctx.fillRect(0,108,W,288);
   ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=2;
   for(const c of S.cols){
     if(c.kind==='trot')continue;
-    for(let i=0;i<c.depth;i++){
-      const sh=c.h/c.depth;ctx.strokeRect(c.x-c.w/2+1,c.top+i*sh+1,c.w-2,sh-2);
-    }
+    const sh=c.h/c.depth;
+    for(let i=0;i<c.depth;i++)ctx.strokeRect(c.x-c.w/2+1,c.top+i*sh+1,c.w-2,sh-2);
   }
-  // gang depan
   ctx.fillStyle='#55585e';ctx.fillRect(0,AISLE_Y-24,W,58);
-  ctx.fillStyle='rgba(255,255,255,.55)';ctx.font='700 9px "JetBrains Mono", monospace';
+  ctx.fillStyle='rgba(255,255,255,.55)';ctx.font='700 9px "JetBrains Mono", monospace';ctx.textAlign='center';ctx.textBaseline='middle';
   for(const c of S.cols)if(c.kind!=='trot')ctx.fillText(c.kind==='car'?'MOBIL':'MOTOR',c.x,AISLE_Y-15);
-  ctx.fillStyle='rgba(255,255,255,.5)';
-  for(let x=150;x<330;x+=60){ctx.beginPath();ctx.moveTo(x,AISLE_Y);ctx.lineTo(x+16,AISLE_Y);ctx.lineTo(x+16,AISLE_Y-5);ctx.lineTo(x+26,AISLE_Y+2);ctx.lineTo(x+16,AISLE_Y+9);ctx.lineTo(x+16,AISLE_Y+4);ctx.lineTo(x,AISLE_Y+4);ctx.closePath();ctx.fill();}
+  ctx.fillStyle='rgba(255,255,255,.45)';
+  for(let x=170;x<320;x+=60){ctx.beginPath();ctx.moveTo(x,AISLE_Y+4);ctx.lineTo(x+16,AISLE_Y+4);ctx.lineTo(x+16,AISLE_Y-1);ctx.lineTo(x+26,AISLE_Y+6);ctx.lineTo(x+16,AISLE_Y+13);ctx.lineTo(x+16,AISLE_Y+8);ctx.lineTo(x,AISLE_Y+8);ctx.closePath();ctx.fill();}
   // trotoar
   ctx.fillStyle='#b9b2a5';ctx.fillRect(0,394,W,54);
   ctx.strokeStyle='rgba(0,0,0,.12)';ctx.lineWidth=1;
   for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,394);ctx.lineTo(x,448);ctx.stroke();}
   for(let x=0;x<W;x+=20){ctx.fillStyle=(x/20)%2?'#f2f2f2':'#1d1d1f';ctx.fillRect(x,444,20,6);}
-  ctx.fillStyle='rgba(0,0,0,.45)';ctx.font='700 10px "JetBrains Mono", monospace';ctx.fillText('TROTOAR',67,393+8);
   for(const c of S.cols){if(c.kind!=='trot')continue;ctx.strokeStyle='rgba(0,0,0,.35)';ctx.setLineDash([4,3]);ctx.strokeRect(c.x-c.w/2+2,c.top+2,c.w-4,c.h-4);ctx.setLineDash([]);}
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.font='700 9px "JetBrains Mono", monospace';ctx.fillText('TROTOAR',250,421);
   // jalan
   ctx.fillStyle='#303236';ctx.fillRect(0,450,W,H-450);
   ctx.fillStyle='rgba(255,255,255,.6)';for(let x=6;x<W;x+=36)ctx.fillRect(x,516,20,3);
   ctx.fillStyle='rgba(255,255,255,.35)';ctx.font='700 10px "JetBrains Mono", monospace';
-  ctx.textAlign='left';ctx.fillText('ANTRE MASUK →',8,462);ctx.fillText('← KELUAR',8,574);ctx.textAlign='center';
-  // pintu masuk
+  ctx.textAlign='left';ctx.fillText('ANTRE MASUK →',8,462);ctx.fillText('← KELUAR',8,572);ctx.textAlign='center';
   ctx.fillStyle='#55585e';ctx.fillRect(386,394,36,56);
+  // palang
+  const closed=S.gateT>0;
+  ctx.save();ctx.translate(392,452);ctx.rotate(closed?0:-Math.PI/2.3);
+  for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#f6f7fb':'#d7263d';ctx.fillRect(-2+i*7,-3,7,6);}
+  ctx.restore();
+  ctx.fillStyle='#1d1d1f';ctx.fillRect(388,446,8,12);
 }
 
 function drawMotor(v){
@@ -494,6 +803,15 @@ function drawCar(v){
   ctx.fillStyle='#fff6c2';ctx.fillRect(L/2-4,-Wd/2+4,4,7);ctx.fillRect(L/2-4,Wd/2-11,4,7);
   ctx.fillStyle='#c0392b';ctx.fillRect(-L/2,-Wd/2+4,3,7);ctx.fillRect(-L/2,Wd/2-11,3,7);
   if(box){ctx.fillStyle='#c9ccd2';ctx.fillRect(-L*.16,-Wd/2+2,L*.3,2);ctx.fillRect(-L*.16,Wd/2-4,L*.3,2);}
+  if(v.special&&v.special.id==='pengantin'){
+    ctx.fillStyle='#ff8fb8';for(const [fx,fy] of [[-.1,-.3],[.05,.2],[.2,-.15],[-.25,.15],[.32,.28]]){ctx.beginPath();ctx.arc(L*fx,Wd*fy,3.2,0,Math.PI*2);ctx.fill();}
+  }
+  if(v.special&&v.special.id==='pikap'){ctx.fillStyle='#7cc36b';ctx.fillRect(-L/2+4,-Wd/2+6,L*.34,Wd-12);ctx.fillStyle='#e05a3a';ctx.beginPath();ctx.arc(-L*.3,-4,4,0,Math.PI*2);ctx.arc(-L*.22,5,4,0,Math.PI*2);ctx.fill();}
+}
+function star(x,y,r){
+  ctx.beginPath();
+  for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);}
+  ctx.closePath();ctx.fillStyle='#ffd166';ctx.fill();ctx.strokeStyle='#8a5a00';ctx.lineWidth=1;ctx.stroke();
 }
 function drawVehicle(v){
   ctx.save();
@@ -504,25 +822,46 @@ function drawVehicle(v){
   ctx.restore();
 }
 
+function styleOf(slot){return STYLE.find(s=>s.slot===slot&&s.id===save.style[slot])||STYLE.find(s=>s.slot===slot);}
 function drawKang(){
   const x=372,y=AISLE_Y-2,up=S.whistleT>0;
+  const vest=styleOf('rompi').color,umb=styleOf('payung').colors,hat=save.style.topi;
+  // payung pos parkir
+  const ux=338,uy=AISLE_Y-4;
+  for(let i=0;i<8;i++){ctx.fillStyle=umb[i%umb.length];ctx.beginPath();ctx.moveTo(ux,uy);ctx.arc(ux,uy,19,i*Math.PI/4,(i+1)*Math.PI/4);ctx.closePath();ctx.fill();}
+  ctx.fillStyle='#1d1d1f';ctx.beginPath();ctx.arc(ux,uy,2.5,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(x+2,y+14,12,5,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#ff7a1a';rrect(x-11,y-6,22,20,5);ctx.fill();
+  ctx.fillStyle=vest;rrect(x-11,y-6,22,20,5);ctx.fill();
   ctx.fillStyle='#e6f25a';ctx.fillRect(x-11,y+3,22,3);
-  ctx.strokeStyle='#ff7a1a';ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.strokeStyle=vest;ctx.lineWidth=5;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(x+9,y-2);ctx.lineTo(up?x+18:x+14,up?y-18:y+8);ctx.stroke();
   ctx.fillStyle='#8a5a3b';ctx.beginPath();ctx.arc(x,y-12,8,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#1d1d1f';ctx.beginPath();ctx.arc(x,y-15,8,Math.PI,0);ctx.fill();
-  if(up){ctx.fillStyle='#fff';ctx.font='800 12px Poppins, sans-serif';ctx.fillText('PRIIIT!',x-4,y-34);}
+  if(hat==='caping'){ctx.fillStyle='#d8b878';ctx.beginPath();ctx.ellipse(x,y-15,15,6,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#c09a55';ctx.beginPath();ctx.arc(x,y-17,5,0,Math.PI*2);ctx.fill();}
+  else if(hat==='peci'){ctx.fillStyle='#111';rrect(x-8,y-22,16,8,2);ctx.fill();}
+  else{ctx.fillStyle='#1d1d1f';ctx.beginPath();ctx.arc(x,y-15,8,Math.PI,0);ctx.fill();}
+  if(has('magang')){
+    const mx=356,my=AISLE_Y+18;
+    ctx.fillStyle=vest;rrect(mx-8,my-5,16,14,4);ctx.fill();
+    ctx.fillStyle='#8a5a3b';ctx.beginPath();ctx.arc(mx,my-9,6,0,Math.PI*2);ctx.fill();
+  }
+  if(up){ctx.fillStyle='#fff';ctx.font='800 12px Poppins, sans-serif';ctx.textAlign='center';ctx.fillText('PRIIIT!',x-4,y-36);}
 }
 
-function tint(){
+function drawWeather(){
   const h=hourOf(S.clock);
   let c=null;
   if(h<8)c=`rgba(255,200,120,${.10*(8-h)/2})`;
   else if(h>=15&&h<18)c=`rgba(255,130,50,${.14*(h-15)/3})`;
   else if(h>=18)c=`rgba(12,22,66,${Math.min(.5,.14+.12*(h-18))})`;
   if(c){ctx.fillStyle=c;ctx.fillRect(0,0,W,H);}
+  if(raining()){
+    ctx.fillStyle='rgba(60,70,90,.25)';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(200,215,240,.45)';ctx.lineWidth=1;
+    const t=performance.now()/1000;
+    ctx.beginPath();
+    for(let i=0;i<70;i++){const x=(i*61+t*90)%W,y=(i*97+t*520)%H;ctx.moveTo(x,y);ctx.lineTo(x-4,y+12);}
+    ctx.stroke();
+  }
   if(h>=18){
     ctx.globalCompositeOperation='lighter';
     for(const [lx,ly] of [[140,AISLE_Y],[300,AISLE_Y],[210,40]]){
@@ -537,6 +876,10 @@ function drawUI(){
   ctx.textAlign='center';ctx.textBaseline='middle';
   for(const v of S.vehicles){
     if(v.dragged)continue;
+    if(v.special&&v.state!=='exiting'&&v.state!=='leaving'){
+      const horiz=Math.abs(Math.cos(v.a))>.5,tw=performance.now()/300;
+      star(v.x+(horiz?v.T.len/2:v.T.wid/2)+2,v.y-(horiz?v.T.wid/2:v.T.len/2)+4,6+Math.sin(tw)*1.2);
+    }
     if(v.state==='queue'){
       const cat=CAT[v.cat];
       ctx.font='700 9px "JetBrains Mono", monospace';
@@ -559,11 +902,22 @@ function drawUI(){
     }
   }
   for(const f of S.floaters){
-    ctx.globalAlpha=Math.max(0,1-f.t/1.2);
+    ctx.globalAlpha=Math.max(0,1-f.t/1.3);
     ctx.font='800 13px Poppins, sans-serif';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';
-    ctx.strokeText(f.txt,f.x,f.y-f.t*30);ctx.fillStyle=f.color;ctx.fillText(f.txt,f.x,f.y-f.t*30);
+    const fx=Math.min(W-90,Math.max(90,f.x));
+    ctx.strokeText(f.txt,fx,f.y-f.t*30);ctx.fillStyle=f.color;ctx.fillText(f.txt,fx,f.y-f.t*30);
   }
-  ctx.globalAlpha=1;ctx.textBaseline='alphabetic';
+  ctx.globalAlpha=1;
+  if(S.streak>=2){
+    ctx.font='800 12px Poppins, sans-serif';const t='PELAYANAN PRIMA x'+S.streak;const tw=ctx.measureText(t).width+16;
+    ctx.fillStyle='rgba(230,242,90,.95)';rrect(W-tw-8,114,tw,20,10);ctx.fill();
+    ctx.fillStyle='#10204a';ctx.fillText(t,W-tw/2-8,124.5);
+  }
+  if(S.banner){
+    ctx.fillStyle=S.banner.color;ctx.fillRect(0,H-26,W,26);
+    ctx.fillStyle='#fff';ctx.font='800 11px Poppins, sans-serif';ctx.fillText(S.banner.text,W/2,H-12.5);
+  }
+  ctx.textBaseline='alphabetic';
 }
 
 function drawDragHints(){
@@ -593,7 +947,7 @@ function render(){
   const list=S.vehicles.filter(v=>!v.dragged).sort((a,b)=>a.y-b.y);
   for(const v of list)drawVehicle(v);
   drawKang();
-  tint();
+  drawWeather();
   drawUI();
   if(drag&&drag.active)drawVehicle(drag.v);
 }
@@ -608,14 +962,11 @@ function hit(v,p){
 }
 function pick(p){
   const list=S.vehicles.filter(v=>v.state!=='leaving').sort((a,b)=>b.y-a.y);
-  // kendaraan kabur diprioritaskan: momen paling butuh refleks
   return list.find(v=>v.state==='exiting'&&v.kabur&&!v.caught&&hit(v,p))
       || list.find(v=>(v.state==='queue'||v.state==='parked'||v.state==='ready')&&hit(v,p))||null;
 }
 const canDrag=v=>v.state==='queue'||((v.state==='parked'||v.state==='ready')&&v.T.fits==='motor'&&isTop(v));
-function dropTarget(v){
-  return S.cols.find(c=>Math.abs(v.x-c.x)<=c.w/2+6&&v.y>=c.top-14&&v.y<=c.top+c.h+14)||null;
-}
+function dropTarget(v){return S.cols.find(c=>Math.abs(v.x-c.x)<=c.w/2+6&&v.y>=c.top-14&&v.y<=c.top+c.h+14)||null;}
 
 cv.addEventListener('pointerdown',e=>{
   if(phase!=='play'||paused)return;
@@ -631,7 +982,7 @@ cv.addEventListener('pointermove',e=>{
   if(!drag.active){
     if(Math.hypot(p.x-drag.sx,p.y-drag.sy)<8)return;
     if(!canDrag(v)){
-      if(v.state!=='exiting'&&v.T.fits==='car'&&v.col){toast('Mobil gak bisa digeser. Kuncinya dibawa pemilik.');sfx.nope();drag.v=null;}
+      if(v.T.fits==='car'&&v.col){toast('Mobil gak bisa digeser. Kuncinya dibawa pemilik.');sfx.nope();drag.v=null;}
       else if(v.col&&!isTop(v)){toast('Motor ini terhalang. Geser yang paling depan dulu.');sfx.nope();drag.v=null;}
       return;
     }
@@ -646,6 +997,7 @@ function endPointer(e,cancel){
   const v=d.v;if(!v)return;
   if(d.active){
     v.dragged=false;
+    if(v.state==='gone')return;
     const c=cancel?null:dropTarget(v);
     if(c&&c!==v.col&&accepts(c,v)&&c.stack.length<c.depth){place(v,c);hintOnce('tap');}
     else{
@@ -662,73 +1014,189 @@ cv.addEventListener('pointercancel',e=>endPointer(e,true));
 
 function tap(v){
   if(v.state==='exiting'&&v.kabur&&!v.caught){
-    v.caught=true;S.caught++;S.whistleT=.6;sfx.whistle();pay(v,false);
+    v.caught=true;S.caught++;S.whistleT=.6;sfx.whistle();collect(v,false);
     toast('Priiit! Ketangkep, akhirnya bayar juga.');return;
   }
   if(v.state==='ready'){
-    if(isTop(v)){exitVehicle(v);return;}
+    if(isTop(v)){exitVehicle(v,false);return;}
     const blockers=v.col.stack.slice(v.col.stack.indexOf(v)+1);
     blockers.forEach(b=>b.shake=.5);sfx.nope();
     toast(blockers.some(b=>b.T.fits==='car')?'Keblokir mobil yang pemiliknya masih belanja.':'Keblokir! Geser dulu motor di depannya.');
     return;
   }
   if(v.state==='queue'){toast('Seret ke lajur parkir yang cocok.');return;}
-  if(v.state==='parked'){toast('Pemiliknya masih belanja.');}
+  if(v.state==='parked')toast('Pemiliknya masih belanja.');
 }
 
-/* ---------- alur ---------- */
+function gate(){
+  if(phase!=='play'||paused||S.gateT>0||S.gateCd>0)return;
+  unlockAudio();
+  S.gateT=GATE_LEN;S.gateCd=has('palang')?18:30;sfx.gate();
+  toast('Palang ditutup '+GATE_LEN+' detik. Kendaraan baru menunggu di luar.');
+}
+$('btnGate').onclick=gate;
+addEventListener('keydown',e=>{
+  if(e.code==='KeyG')gate();
+  if(e.code==='KeyP'||e.code==='Escape')pause(!paused);
+});
+
+/* ---------- layar ---------- */
 const hints={tap:false};
 function hintOnce(k){
   if(hints[k])return;hints[k]=true;
-  if(k==='tap')$('hint').textContent='Tunggu tanda ! muncul, lalu ketuk kendaraannya untuk menagih.';
+  if(k==='tap')$('hint').textContent='Tunggu tanda ! muncul, lalu ketuk kendaraannya untuk menagih. Makin cepat, makin besar tipnya.';
 }
 let toastT=0;
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');toastT=2.4;}
 
+function renderMissions(el,missions,live){
+  el.innerHTML=missions.map(m=>{
+    const def=missionDef(m.id),cur=live&&!m.done&&!def.endOnly?Math.min(m.n,def.get(S)):null;
+    const pg=cur!==null&&m.n>1?`<span class="pg">${def.id==='tips'?fmt(cur):cur}/${def.id==='tips'?fmt(m.n):m.n}</span>`:'';
+    return `<li class="${m.done?'done':''}"><span class="tick">${m.done?'✓':''}</span><span>${esc(def.text(m.n))} ${pg}</span><span class="rw">+${fmt(def.reward)}</span></li>`;
+  }).join('');
+}
+
+function coffeeBonus(){
+  const k=d=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  const today=k(new Date()),yesterday=k(new Date(Date.now()-864e5));
+  if(save.coffee.last===today)return null;
+  const count=save.coffee.last===yesterday?save.coffee.count+1:1;
+  const amt=2000*Math.min(count,5);
+  save.coffee={last:today,count};save.saving+=amt;persist();
+  return {count,amt};
+}
+
+function renderAlbum(){
+  const n=Object.keys(save.album).length;
+  $('albumTitle').textContent=n?`${n} dari ${SPECIALS.length} kendaraan langka sudah kamu layani.`:'Belum ada kendaraan langka. Mulai hari 2, cari yang berbintang.';
+  $('albumGrid').innerHTML=SPECIALS.map(s=>{
+    const got=!!save.album[s.id];
+    return `<div class="${got?'':'locked'}"><span class="sw" style="background:${got?s.color:'#2a5bbd'}"></span><b>${got?esc(s.name):'???'}</b><span>${got?esc(s.desc):(s.fits==='car'?'Sebuah mobil langka':'Sebuah motor langka')}</span></div>`;
+  }).join('');
+}
+
 function showCard(id){
-  for(const c of ['scrStart','scrIntro','scrEnd','scrPause'])$(c).hidden=c!==id;
+  for(const c of ['scrHome','scrPrep','scrEnd','scrShop','scrPause','scrAlbum'])$(c).hidden=c!==id;
   $('overlay').hidden=!id;
+  if(id)$('overlay').scrollTop=0;
 }
 
-function renderStart(){
-  const resume=progress.day>1;
-  $('btnStart').textContent=resume?`Lanjut hari ${progress.day}`:'Mulai kerja';
-  $('btnFresh').hidden=!resume;
-  if(progress.best){$('bestLine').textContent=`Rekor kamu: sampai hari ${progress.best.day}, pendapatan terbaik ${fmt(progress.best.money)} sehari.`;$('bestLine').hidden=false;}
+function renderHome(){
+  $('homeSaving').textContent=fmt(save.saving);
+  $('homeTitle').textContent=save.day===1&&!save.best?'Rompi sudah dipakai, peluit siap.':'Parkiran menunggu, Bang.';
+  $('btnHomePlay').textContent='Siapkan hari '+save.day;
+  const ri=rankIdx(save.xp),nextT=RANKS[ri+1]?RANKS[ri+1][0]:null;
+  $('homeRank').textContent=RANKS[ri][1];
+  $('homeXp').textContent=nextT?`${save.xp} / ${nextT} XP`:`${save.xp} XP · pangkat tertinggi`;
+  $('homeXpBar').style.width=(nextT?Math.min(100,(save.xp-RANKS[ri][0])/(nextT-RANKS[ri][0])*100):100)+'%';
+  $('btnHomeAlbum').textContent=`Album ${Object.keys(save.album).length}/${SPECIALS.length}`;
+  if(save.best){$('homeBest').textContent=`Rekor: sampai hari ${save.best.day}, pendapatan terbaik ${fmt(save.best.money)} sehari.`;$('homeBest').hidden=false;}
+  $('howto').open=save.day===1&&!save.best;
 }
 
-function intro(day){
-  S=newDay(day);phase='intro';
-  const it=INTRO[day]||['Makin ramai.','Pelanggan makin banyak dan makin gak sabaran. Tetap jaga urutan parkir.'];
-  $('introEyebrow').textContent=`Hari ${day} · setoran ${fmt(S.target)}`;
-  $('introTitle').textContent=it[0];
-  $('introText').textContent=it[1];
-  showCard('scrIntro');
+function eventText(e){
+  if(e.type==='hujan')return 'Hujan jam 15–18: pelanggan belanja lebih lama, ojol lebih ramai.';
+  if(e.type==='satpol')return `Satpol PP patroli sekitar jam ${e.hour}: trotoar harus kosong, atau denda ${fmt(FINE_PER)} per motor.`;
+  if(e.type==='rombongan')return `Rombongan arisan sekitar jam ${e.hour}: lima motor datang sekaligus.`;
+  return '';
 }
 
-function go(){unlockAudio();phase='play';paused=false;showCard(null);toast(`Jam 06:00. Setoran hari ini ${fmt(S.target)}.`);}
+function renderPrep(){
+  plan=plan&&plan.day===save.day?plan:planDay(save.day);
+  plan.loc=unlocked(locById(save.loc))?locById(save.loc):LOCS[0];
+  plan.tarif=save.tarif;
+  const t=targetFor(plan.day,plan.loc);
+  $('prepEyebrow').textContent=`Hari ${plan.day} · setoran ${fmt(t)}`;
+  $('locChoices').innerHTML=LOCS.map(l=>{
+    const ok=unlocked(l);
+    return `<label class="choice"><input type="radio" name="loc" id="loc-${l.id}" value="${l.id}" ${l.id===plan.loc.id?'checked':''} ${ok?'':'disabled'}>
+      <span class="box"><b>${esc(l.name)}</b>${ok?esc(l.desc)+` <span class="price">Setoran ${fmt(targetFor(plan.day,l))}</span>`:'Terbuka di hari '+l.unlock}</span></label>`;
+  }).join('');
+  $('tarifChoices').innerHTML=Object.entries(TARIF).map(([k,tf])=>`<label class="choice"><input type="radio" name="tarif" id="tarif-${k}" value="${k}" ${k===plan.tarif?'checked':''}>
+      <span class="box"><b>${tf.label}</b><span class="price">Motor ${fmt(tf.motor)}<br>Mobil ${fmt(tf.mobil)}</span>${tf.desc}</span></label>`).join('');
+  renderMissions($('prepMissions'),plan.missions,false);
+  const fc=plan.events.map(eventText);
+  if(plan.loc.id==='masjid')fc.unshift('Jelang salat Jumat (jam 11–12) parkiran penuh, lalu semua keluar sekitar jam 13.');
+  $('forecast').innerHTML=(fc.length?fc:['Cerah, tidak ada kejadian khusus.']).map(x=>`<li>${esc(x)}</li>`).join('');
+  $('prepRule').textContent=`Aturan uang: pendapatan = tarif + tip. Kalau pendapatan mencapai setoran, bos ambil ${fmt(t)}, lalu kamu bayar makan ${fmt(MEAL)} dan denda (kalau ada). Sisanya masuk tabungan. Kalau pendapatan kurang dari setoran, semuanya diambil bos, makan dibayar dari tabungan, dan hari diulang. Kamu tidak pernah berutang.`;
+  for(const el of document.querySelectorAll('input[name=loc]'))el.onchange=()=>{save.loc=el.value;persist();renderPrep();};
+  for(const el of document.querySelectorAll('input[name=tarif]'))el.onchange=()=>{save.tarif=el.value;persist();renderPrep();};
+}
 
-let endState=null,shareText='';
+function startDay(){
+  unlockAudio();
+  S=newDay(plan);phase='play';paused=false;nextId=1;
+  hints.tap=false;$('hint').textContent='Seret kendaraan di jalan ke lajur parkir.';
+  showCard(null);
+  toast(`Jam 06:00 di ${S.loc.name}. Setoran hari ini ${fmt(S.target)}.`);
+}
+
+let endInfo=null,shareText='';
 function endDay(reason){
   if(phase!=='play')return;
-  phase='end';drag=null;
-  const passed=reason==='time'&&S.money>=S.target;
-  if(passed)progress.day=Math.max(progress.day,S.day+1);
-  const best=progress.best||{day:0,money:0};
-  progress.best={day:Math.max(best.day,S.day),money:Math.max(best.money,S.money)};
-  store.set('progress',progress);
-  endState={passed,day:S.day};
-  $('endEyebrow').textContent=`Hari ${S.day} selesai · ${clockStr(Math.min(S.clock,DAY_LEN))}`;
-  if(reason==='fired'){$('endTitle').textContent='Kamu diusir pemilik toko.';$('endVerdict').textContent='Tiga komplain dalam sehari. Coba lagi, dan jangan biarkan kendaraan keblokir.';}
-  else if(passed){$('endTitle').textContent='Setoran aman. Bos senang.';$('endVerdict').textContent=`Lebih ${fmt(S.money-S.target)} masuk kantong sendiri.`;}
-  else{$('endTitle').textContent='Setoran kurang.';$('endVerdict').textContent=`Masih kurang ${fmt(S.target-S.money)}. Bos manyun.`;}
+  phase='end';drag=null;paused=false;
+  const income=S.fares+S.tips,passed=reason==='time'&&income>=S.target;
+  // Urutan potongan: setoran bos, lalu makan, lalu denda. Yang tidak tertutup uangmu tidak jadi utang.
+  const toBoss=passed?S.target:income;
+  const before=save.saving;
+  let available=before+income-toBoss;
+  const mealPaid=Math.min(MEAL,available);available-=mealPaid;
+  const finePaid=Math.min(S.fines,available);available-=finePaid;
+  // Misi tetap dibayar walau setoran kurang
+  checkMissions(reason==='time');
+  const doneM=S.missions.filter(m=>m.done);
+  const missionBonus=doneM.reduce((s,m)=>s+missionDef(m.id).reward,0);
+  available+=missionBonus;
+  S.xp+=10*doneM.length+(passed?15:0)+(passed&&S.komplain===0?10:0);
+  const r0=rankIdx(save.xp);save.xp+=S.xp;const r1=rankIdx(save.xp);
+  const rankBonus=r1>r0?10000*r1:0;available+=rankBonus;
+  const net=available-before;
+  save.saving=available;
+  if(passed)save.day=S.day+1;
+  const best=save.best||{day:0,money:0};
+  save.best={day:Math.max(best.day,S.day),money:Math.max(best.money,income)};
+  persist();
+  plan=null;
+  endInfo={passed,day:S.day};
+
+  $('endEyebrow').textContent=`Hari ${S.day} · ${S.loc.name} · ${clockStr(Math.min(S.clock,DAY_LEN))}`;
+  if(reason==='fired'){$('endTitle').textContent='Kamu diusir pemilik lahan.';$('endVerdict').textContent='Tiga komplain dalam sehari. Jangan biarkan kendaraan keblokir.';}
+  else if(reason==='quit'){$('endTitle').textContent='Pulang lebih awal.';$('endVerdict').textContent='Hari ini dianggap gagal.';}
+  else if(passed){$('endTitle').textContent='Setoran aman. Bos senang.';$('endVerdict').textContent=net>=0?`${fmt(net)} masuk tabungan.`:`Setoran aman, tapi hari ini nombok ${fmt(-net)}.`;}
+  else{$('endTitle').textContent='Setoran kurang.';$('endVerdict').textContent=`Kurang ${fmt(S.target-income)}. Semua pendapatan diambil bos.`;}
   $('endVerdict').className='verdict '+(passed?'good':'bad');
-  $('eMoney').textContent=fmt(S.money);$('eTarget').textContent=fmt(S.target);
-  $('eServed').textContent=S.served;$('eTips').textContent=fmt(S.tips);
-  $('eCaught').textContent=S.caught;$('eLost').textContent=S.lost;
-  $('btnNext').textContent=passed?`Lanjut ke hari ${S.day+1}`:`Ulangi hari ${S.day}`;
-  shareText=`Jadi Kang Parkir di hari ke-${S.day}: ngumpulin ${fmt(S.money)}, nangkep ${S.caught} motor kabur, ${S.komplain} komplain. ${passed?'Setoran aman!':'Setoran kurang, bos manyun.'} Kamu bisa lebih rapi?`;
-  $('eShare').textContent=shareText;
+
+  const row=(a,b,cls)=>`<div class="row ${cls||''}"><span>${a}</span><span>${b}</span></div>`;
+  $('nota').innerHTML=
+    `<div class="head">NOTA PARKIR · HARI ${S.day}</div>`+
+    row(`Tarif parkir (${S.served} kendaraan)`,fmt(S.fares),'sub')+
+    row('Tip & bonus Prima',fmt(S.tips),'sub')+
+    row('Pendapatan',fmt(income))+
+    row(passed?'Setoran ke bos':'Diambil bos (setoran kurang)',fmt(-toBoss),'neg')+
+    row('Makan & kopi',fmt(-mealPaid),'neg')+
+    (mealPaid<MEAL?row('Sisa makan ditraktir Bu Tini',fmt(MEAL-mealPaid),'sub'):'')+
+    (S.fines?row('Denda Satpol PP',fmt(-finePaid),'neg'):'')+
+    (finePaid<S.fines?row('Sisa denda diputihkan',fmt(S.fines-finePaid),'sub'):'')+
+    (missionBonus?row(`Bonus misi (${doneM.length}/${S.missions.length})`,fmt(missionBonus),'pos'):'')+
+    (rankBonus?row('Bonus naik pangkat',fmt(rankBonus),'pos'):'')+
+    row(net>=0?'Masuk tabungan':'Diambil dari tabungan',fmt(net),'total '+(net>=0?'pos':'neg'))+
+    row('Tabungan sekarang',fmt(save.saving),'sub');
+  renderMissions($('endMissions'),S.missions,false);
+  $('endRankUp').hidden=!rankBonus;
+  if(rankBonus){$('endRankUp').textContent=`Naik pangkat jadi ${RANKS[r1][1]}! Bonus ${fmt(rankBonus)} sudah masuk tabungan.`;sfx.whistle();}
+  const next=[];
+  if(r1<RANKS.length-1)next.push(`<b>${RANKS[r1+1][0]-save.xp} XP</b> lagi untuk jadi ${esc(RANKS[r1+1][1])}.`);
+  const nl=LOCS.find(l=>!unlocked(l));
+  if(nl)next.push(`${esc(nl.name)} terbuka di <b>hari ${nl.unlock}</b>.`);
+  const ng=GEAR.filter(g=>!has(g.id)).sort((a,b)=>a.price-b.price)[0];
+  if(ng)next.push(save.saving>=ng.price?`Tabunganmu cukup untuk beli <b>${esc(ng.name)}</b> di Warung.`:`<b>${fmt(ng.price-save.saving)}</b> lagi untuk beli ${esc(ng.name)}.`);
+  const albumLeft=SPECIALS.length-Object.keys(save.album).length;
+  if(albumLeft)next.push(`<b>${albumLeft}</b> kendaraan langka belum masuk album.`);
+  $('endNext').innerHTML=next.slice(0,3).map(x=>`<li>${x}</li>`).join('');
+  $('endMini').innerHTML=`<span>XP <b>+${S.xp}</b></span><span>Kabur tertangkap <b>${S.caught}</b></span><span>Lolos <b>${S.lost}</b></span><span>Komplain <b>${S.komplain}</b></span><span>Prima terbaik <b>x${S.bestStreak}</b></span><span>Pergi karena antre <b>${S.left}</b></span>`;
+  $('btnNext').textContent=passed?`Siapkan hari ${S.day+1}`:`Ulangi hari ${S.day}`;
+  shareText=`Kang Parkir hari ke-${S.day} di ${S.loc.name}: pendapatan ${fmt(income)}, tip ${fmt(S.tips)}, Prima x${S.bestStreak}, nangkep ${S.caught} motor kabur. ${passed?'Setoran aman!':'Setoran kurang, bos manyun.'} Kamu bisa lebih rapi?`;
   $('btnCopy').textContent='Salin hasil';
   showCard('scrEnd');
 }
@@ -736,40 +1204,82 @@ function endDay(reason){
 function pause(on){
   if(phase!=='play')return;
   paused=on;
-  if(on){drag=null;S.vehicles.forEach(v=>v.dragged=false);showCard('scrPause');}
+  if(on){drag=null;S.vehicles.forEach(v=>v.dragged=false);renderMissions($('pauseMissions'),S.missions,true);showCard('scrPause');}
   else showCard(null);
 }
 
-$('btnStart').onclick=()=>{unlockAudio();intro(progress.day);};
-$('btnFresh').onclick=()=>{unlockAudio();progress.day=1;store.set('progress',progress);intro(1);};
-$('btnGo').onclick=go;
-$('btnNext').onclick=()=>{if(!endState)return;intro(endState.passed?endState.day+1:endState.day);};
+/* ---------- warung ---------- */
+function renderShop(){
+  $('shopSaving').textContent=fmt(save.saving);
+  $('shopGear').innerHTML=GEAR.map(g=>`<div class="item"><span class="name">${esc(g.name)}</span><span class="desc">${esc(g.desc)}</span>
+    ${has(g.id)?'<span class="owned">Dimiliki</span>':`<button data-gear="${g.id}" ${save.saving<g.price?'disabled':''}>${fmt(g.price)}</button>`}</div>`).join('');
+  $('shopStyle').innerHTML=STYLE.map(s=>{
+    const key=s.slot+':'+s.id,owned=save.owned.includes(key),on=save.style[s.slot]===s.id;
+    const btn=on?'<span class="owned">Dipakai</span>':owned?`<button data-wear="${key}">Pakai</button>`:`<button data-style="${key}" ${save.saving<s.price?'disabled':''}>${fmt(s.price)}</button>`;
+    return `<div class="item"><span class="name">${esc(s.name)}</span><span class="desc">${s.slot==='rompi'?'Rompi':s.slot==='topi'?'Topi':'Pos parkir'}</span>${btn}</div>`;
+  }).join('');
+  for(const b of document.querySelectorAll('[data-gear]'))b.onclick=()=>{
+    const g=GEAR.find(x=>x.id===b.dataset.gear);if(!g||save.saving<g.price)return;
+    save.saving-=g.price;save.gear[g.id]=true;persist();sfx.coin(true);renderShop();
+  };
+  for(const b of document.querySelectorAll('[data-style]'))b.onclick=()=>{
+    const [slot,id]=b.dataset.style.split(':'),s=STYLE.find(x=>x.slot===slot&&x.id===id);if(!s||save.saving<s.price)return;
+    save.saving-=s.price;save.owned.push(slot+':'+id);save.style[slot]=id;persist();sfx.coin();renderShop();
+  };
+  for(const b of document.querySelectorAll('[data-wear]'))b.onclick=()=>{
+    const [slot,id]=b.dataset.wear.split(':');save.style[slot]=id;persist();renderShop();
+  };
+}
+function openShop(from){returnTo=from;renderShop();showCard('scrShop');}
+
+/* ---------- tombol ---------- */
+$('btnHomePlay').onclick=()=>{unlockAudio();renderPrep();showCard('scrPrep');};
+$('btnHomeShop').onclick=()=>openShop('home');
+$('btnHomeAlbum').onclick=()=>{renderAlbum();showCard('scrAlbum');};
+$('btnAlbumBack').onclick=()=>{renderHome();showCard('scrHome');};
+$('btnPrepShop').onclick=()=>openShop('prep');
+$('btnEndShop').onclick=()=>openShop('end');
+$('btnShopBack').onclick=()=>{
+  if(returnTo==='prep'){renderPrep();showCard('scrPrep');}
+  else if(returnTo==='end')showCard('scrEnd');
+  else{renderHome();showCard('scrHome');}
+};
+$('btnGo').onclick=startDay;
+$('btnNext').onclick=()=>{renderPrep();showCard('scrPrep');};
 $('btnResume').onclick=()=>pause(false);
+$('btnGiveUp').onclick=()=>{paused=false;endDay('quit');};
 $('btnPause').onclick=()=>pause(!paused);
-$('btnMute').onclick=()=>{muted=!muted;$('btnMute').textContent=muted?'Suara: mati':'Suara: nyala';$('btnMute').setAttribute('aria-pressed',String(muted));};
+$('btnMute').onclick=()=>{muted=!muted;$('btnMute').textContent=muted?'Suara: mati':'Suara';$('btnMute').setAttribute('aria-pressed',String(muted));};
 $('btnCopy').onclick=()=>{
-  const sel=()=>{const r=document.createRange();r.selectNodeContents($('eShare'));const s=getSelection();s.removeAllRanges();s.addRange(r);$('btnCopy').textContent='Teks dipilih, tekan salin';};
-  try{navigator.clipboard.writeText(shareText).then(()=>{$('btnCopy').textContent='Tersalin';},sel);}catch(e){sel();}
+  const fallback=()=>{$('btnCopy').textContent='Gagal menyalin';toast(shareText);};
+  try{navigator.clipboard.writeText(shareText).then(()=>{$('btnCopy').textContent='Tersalin';},fallback);}catch(e){fallback();}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&phase==='play'&&!paused)pause(true);});
-addEventListener('keydown',e=>{if(e.code==='KeyP'||e.code==='Escape')pause(!paused);});
 
 /* ---------- HUD & loop ---------- */
 function hud(){
   $('hDay').textContent=S.day;
   $('hClock').textContent=clockStr(Math.min(S.clock,DAY_LEN));
+  $('hLoc').textContent=S.loc.name;
   $('hKomplain').textContent='●'.repeat(S.komplain)+'○'.repeat(Math.max(0,3-S.komplain));
-  $('hKabur').textContent=S.caught+'/'+(S.caught+S.lost);
-  $('hMoney').textContent=fmt(S.money);
+  $('hMission').textContent=S.missions.length?S.missions.filter(m=>m.done).length+'/'+S.missions.length:'–';
+  const income=S.fares+S.tips;
+  $('hMoney').textContent=fmt(income);
+  $('hTip').textContent='(tip '+fmt(S.tips)+')';
   $('hTarget').textContent='Setoran '+fmt(S.target);
-  const bar=$('hBar'),p=Math.min(1,S.money/S.target);
+  const bar=$('hBar'),p=Math.min(1,income/S.target);
   bar.style.width=(p*100)+'%';bar.classList.toggle('done',p>=1);
+  const g=$('btnGate'),play=phase==='play'&&!paused;
+  g.disabled=!play||S.gateT>0||S.gateCd>0;
+  $('gateLabel').textContent=S.gateT>0?`Palang tutup ${Math.ceil(S.gateT)} dtk`:S.gateCd>0?`Palang siap ${Math.ceil(S.gateCd)} dtk`:'Tutup palang';
+  const maxCd=has('palang')?18:30;
+  $('gateCd').style.width=(S.gateCd>0?(1-S.gateCd/maxCd)*100:100)+'%';
 }
 
 /* contoh parkiran yang terisi untuk tampilan awal, sebelum pemain mulai */
 function demoScene(){
-  S=newDay(progress.day);
-  const mk=(type,color,shopCat)=>({id:nextId++,type,T:TYPES[type],color,x:0,y:0,a:-Math.PI/2,state:'parked',col:null,path:[],speed:240,shop:99,cat:shopCat,qpat:10,qpatMax:16,pat:0,patMax:9,kabur:false,caught:false,readyAt:0,shake:0,dragged:false,rider:false});
+  S=newDay({day:save.day,loc:LOCS[0],tarif:'normal',events:[]});
+  const mk=(type,color,cat)=>({id:nextId++,type,T:TYPES[type],pay:2000,color,x:0,y:0,a:-Math.PI/2,state:'parked',col:null,path:[],speed:240,shop:99,cat,qpat:10,qpatMax:16,pat:0,patMax:9,kabur:false,caught:false,readyAt:0,shake:0,dragged:false,rider:false});
   const put=(v,ci)=>{const c=S.cols[ci];c.stack.push(v);v.col=c;v.x=c.x;v.y=slotY(c,c.stack.length-1);S.vehicles.push(v);};
   put(mk('motor','#d7263d','lama'),0);put(mk('motor','#2e86ab','sedang'),0);
   put(mk('motor','#f4d35e','lama'),2);put(mk('mobil','#e8e8e8','lama'),5);
@@ -790,8 +1300,40 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
+/* ---------- aplikasi native (Capacitor). Di browser bagian ini tidak berjalan. ---------- */
+const Cap=window.Capacitor;
+const native=!!(Cap&&Cap.isNativePlatform&&Cap.isNativePlatform());
+function buzz(ms){
+  try{
+    if(native&&Cap.Plugins.Haptics)Cap.Plugins.Haptics.impact({style:'HEAVY'});
+    else if(navigator.vibrate)navigator.vibrate(ms);
+  }catch(e){}
+}
+function setupNative(){
+  if(!native)return;
+  document.documentElement.classList.add('native');
+  const P=Cap.Plugins;
+  try{if(P.StatusBar){P.StatusBar.setStyle({style:'DARK'});P.StatusBar.setBackgroundColor({color:'#123a8c'});}}catch(e){}
+  if(!P.App)return;
+  P.App.addListener('pause',()=>{if(phase==='play'&&!paused)pause(true);});
+  P.App.addListener('backButton',()=>{
+    if(phase==='play'){pause(!paused);return;}
+    if(!$('scrShop').hidden){$('btnShopBack').click();return;}
+    if(!$('scrPrep').hidden||!$('scrEnd').hidden){renderHome();showCard('scrHome');return;}
+    P.App.exitApp();
+  });
+}
+
 function boot(){
-  fit();demoScene();renderStart();showCard('scrStart');
+  setupNative();
+  const coffee=coffeeBonus();
+  if(coffee){
+    $('homeBonus').textContent=coffee.count>1
+      ?`Kopi pagi hari ke-${coffee.count} berturut-turut: ${fmt(coffee.amt)} masuk tabungan. Bonusnya naik tiap hari sampai ${fmt(10000)}.`
+      :`Kopi pagi: ${fmt(coffee.amt)} masuk tabungan. Main lagi besok, bonusnya naik.`;
+    $('homeBonus').hidden=false;
+  }
+  fit();demoScene();renderHome();showCard('scrHome');
   requestAnimationFrame(frame);
 }
 window.claude?.hot?.ready?window.claude.hot.ready(boot):boot();

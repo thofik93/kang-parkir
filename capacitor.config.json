@@ -1,0 +1,20 @@
+{
+  "appId": "io.github.thofik93.kangparkir",
+  "appName": "Kang Parkir",
+  "webDir": "www",
+  "backgroundColor": "#123a8c",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#123a8c",
+      "overlaysWebView": false
+    }
+  }
+}
