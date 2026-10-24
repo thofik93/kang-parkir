@@ -27,12 +27,13 @@
   --ok:#4fd18b;
   --paper:#fbf7ec;
   --ink:#1d2433;
-  --scrim:rgba(8,24,62,.94);
+  --scrim:rgba(8,24,62,.985);
   --display:"Poppins", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   --body:"Source Sans 3", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, monospace;
   color-scheme:dark;
 }
+*,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{background:var(--sign);color:var(--fg)}
 body{
@@ -65,7 +66,8 @@ body{
 #hKomplain{color:var(--danger);letter-spacing:.12em}
 #hLoc{overflow:hidden;text-overflow:ellipsis;font-family:var(--body);font-size:14px}
 .money{grid-column:1 / -1;display:flex;flex-direction:column;gap:3px}
-.money-row{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.money-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 8px;font-family:var(--mono);font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.money-row > span{white-space:nowrap}
 .money-row .tip{color:var(--muted);font-weight:600}
 .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--vest);transition:width .2s}
@@ -84,15 +86,19 @@ canvas{display:block;width:100%;max-width:100%;aspect-ratio:420/580;touch-action
 /* Overlay: kartu bisa digulir, tapi barisan aksi utama menempel di bawah */
 .overlay{position:absolute;inset:0;background:var(--scrim);display:flex;overflow:auto;overscroll-behavior:contain}
 .card{width:100%;max-width:420px;margin:auto;display:flex;flex-direction:column;gap:12px;padding:16px 16px 0}
+/* Kartu boleh lebih tinggi dari layar dan digulir; isinya jangan pernah disusutkan sampai saling menimpa */
+.card > *{flex-shrink:0}
 .card h2{font-family:var(--display);font-weight:800;font-size:1.35rem;margin:0;line-height:1.15;text-wrap:balance}
 .card h3{font-family:var(--display);font-weight:700;font-size:.95rem;margin:4px 0 0}
 .card p{margin:0}
 .actions{
-  position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;
+  position:sticky;bottom:0;display:flex;gap:8px;
   padding:12px 0 16px;margin-top:auto;
-  background:linear-gradient(180deg,rgba(8,24,62,0),var(--sign-deep) 30%);
+  background:linear-gradient(180deg,rgba(8,24,62,0),rgb(8,24,62) 30%);
 }
-.actions .primary{flex:1 1 180px}
+.actions .primary{flex:1 1 auto;min-width:0}
+.actions button{white-space:nowrap}
+.card .secondary{align-self:flex-start}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--reflect)}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}
 .steps b{color:var(--vest)}
@@ -105,7 +111,7 @@ details[open] summary{margin-bottom:8px}
 
 .choices{display:grid;gap:8px}
 .choices.cols3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.choice{position:relative}
+.choice{position:relative;display:block;min-width:0}
 .choice input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
 .choice .box{
   display:flex;flex-direction:column;gap:2px;height:100%;
@@ -222,6 +228,7 @@ button.ghost{background:transparent}
             <div class="rank-top"><b id="homeRank">Kang Parkir Magang</b><span id="homeXp">0 XP</span></div>
             <div class="bar"><i id="homeXpBar"></i></div>
           </div>
+          <button class="ghost secondary" id="btnHomeAlbum">Album 0/6</button>
           <p class="rule" id="homeBest" hidden></p>
           <details id="howto">
             <summary>Cara main</summary>
@@ -238,7 +245,6 @@ button.ghost{background:transparent}
           <div class="actions">
             <button class="primary" id="btnHomePlay">Siapkan hari 1</button>
             <button id="btnHomeShop">Warung</button>
-            <button id="btnHomeAlbum">Album 0/6</button>
           </div>
         </div>
 
@@ -280,10 +286,10 @@ button.ghost{background:transparent}
           <div class="mini" id="endMini"></div>
           <h3>Selanjutnya</h3>
           <ul class="next" id="endNext"></ul>
+          <button class="ghost secondary" id="btnCopy">Salin hasil</button>
           <div class="actions">
             <button class="primary" id="btnNext">Lanjut</button>
             <button id="btnEndShop">Warung</button>
-            <button class="ghost" id="btnCopy">Salin hasil</button>
           </div>
         </div>
 
@@ -307,9 +313,9 @@ button.ghost{background:transparent}
           <h2>Istirahat dulu.</h2>
           <p>Waktu berhenti sampai kamu kembali.</p>
           <ul class="missions" id="pauseMissions"></ul>
+          <button class="ghost secondary" id="btnGiveUp">Pulang (hari dianggap gagal)</button>
           <div class="actions">
             <button class="primary" id="btnResume">Lanjut jaga</button>
-            <button class="ghost" id="btnGiveUp">Pulang (hari dianggap gagal)</button>
           </div>
         </div>
       </div>
@@ -1273,7 +1279,7 @@ function hud(){
   g.disabled=!play||S.gateT>0||S.gateCd>0;
   $('gateLabel').textContent=S.gateT>0?`Palang tutup ${Math.ceil(S.gateT)} dtk`:S.gateCd>0?`Palang siap ${Math.ceil(S.gateCd)} dtk`:'Tutup palang';
   const maxCd=has('palang')?18:30;
-  $('gateCd').style.width=(S.gateCd>0?(1-S.gateCd/maxCd)*100:100)+'%';
+  $('gateCd').style.width=(phase!=='play'?0:S.gateCd>0?(1-S.gateCd/maxCd)*100:100)+'%';
 }
 
 /* contoh parkiran yang terisi untuk tampilan awal, sebelum pemain mulai */
