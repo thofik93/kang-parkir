@@ -209,7 +209,7 @@ button.ghost{background:transparent}
       <div class="stat"><span class="k">Misi</span><span class="v" id="hMission">0/3</span></div>
       <div class="stat"><span class="k">Komplain</span><span class="v" id="hKomplain">○○○</span></div>
       <div class="money">
-        <div class="money-row"><span>Pendapatan <span id="hMoney">Rp0</span> <span class="tip" id="hTip">(tip Rp0)</span></span><span id="hTarget">Setoran Rp30.000</span></div>
+        <div class="money-row"><span>Pendapatan <span id="hMoney">Rp0</span> <span class="tip" id="hTip">(bonus Rp0)</span></span><span id="hTarget">Setoran Rp30.000</span></div>
         <div class="bar"><i id="hBar"></i></div>
       </div>
     </div>
@@ -240,7 +240,12 @@ button.ghost{background:transparent}
               <li>Motor yang menghalangi bisa <b>digeser</b>. Mobil tidak bisa.</li>
               <li>Motor <b>kabur</b>? Ketuk sebelum hilang dari layar.</li>
               <li>Tekan <b>Tutup palang</b> untuk menahan kendaraan baru sebentar saat parkiran penuh.</li>
+              <li>Kadang ada <b>rejeki nomplok</b> saat menagih, dan <b>uang jatuh</b> di parkiran. Ketuk uangnya sebelum hilang.</li>
             </ol>
+          </details>
+          <details>
+            <summary>Peluang hadiah</summary>
+            <p class="rule" id="oddsText"></p>
           </details>
           <div class="actions">
             <button class="primary" id="btnHomePlay">Siapkan hari 1</button>
@@ -412,6 +417,12 @@ const SPECIALS=[
   {id:'pikap',    name:'Pikap Sayur',     fits:'car',  color:'#3f8f4f',desc:'Bawa sayur segar dari dataran tinggi.'}
 ];
 const SPECIAL_TIPS=[3000,5000,5000,10000,10000,20000];
+/* Hadiah tak terduga. Peluang ditampilkan ke pemain di "Cara main". */
+const REJEKI=[[2,65],[3,25],[5,8],[10,2]];            // [kelipatan tarif, bobot %]
+const REJEKI_BASE=.04,REJEKI_STEP=.01,REJEKI_MAX=.4;   // peluang naik tiap tagihan tanpa rejeki
+const DROPS=[[500,40],[1000,30],[2000,18],[5000,9],[10000,3]];
+const DROP_GAP=[12,35],DROP_LIFE=4.5;
+function pickWeighted(table){let r=Math.random()*table.reduce((s,x)=>s+x[1],0);for(const [v,w] of table){if((r-=w)<=0)return v;}return table[0][0];}
 const MISSIONS=[
   {id:'serve',     minDay:1,n:d=>10+Math.min(20,d*2),            text:n=>`Layani ${n} kendaraan`,         get:s=>s.served,     reward:4000},
   {id:'prima',     minDay:1,n:d=>Math.min(8,3+Math.floor(d/3)),  text:n=>`Capai Pelayanan Prima x${n}`,   get:s=>s.bestStreak, reward:5000},
@@ -419,7 +430,9 @@ const MISSIONS=[
   {id:'nokomplain',minDay:1,n:()=>1,                             text:()=>'Tutup hari tanpa komplain',     get:s=>s.clock>=DAY_LEN&&s.komplain===0?1:0,endOnly:true,reward:6000},
   {id:'kabur',     minDay:2,n:d=>Math.min(4,1+Math.floor(d/4)),  text:n=>`Tangkap ${n} motor kabur`,      get:s=>s.caught,     reward:5000},
   {id:'mobil',     minDay:2,n:d=>Math.min(15,3+d),               text:n=>`Layani ${n} mobil`,             get:s=>s.carsServed, reward:4000},
-  {id:'spesial',   minDay:2,n:()=>1,                             text:()=>'Layani satu pelanggan spesial', get:s=>s.special,    reward:5000}
+  {id:'spesial',   minDay:2,n:()=>1,                             text:()=>'Layani satu pelanggan spesial', get:s=>s.special,    reward:5000},
+  {id:'rejeki',    minDay:1,n:d=>d<4?1:2,                        text:n=>`Dapat ${n} rejeki nomplok`,     get:s=>s.rejeki,     reward:4000},
+  {id:'jatuh',     minDay:1,n:d=>d<3?2:3,                        text:n=>`Pungut ${n} uang jatuh`,        get:s=>s.picked,     reward:4000}
 ];
 const missionDef=id=>MISSIONS.find(m=>m.id===id);
 const baseTarget=d=>d<=4?[30000,50000,70000,90000][d-1]:90000+(d-4)*8000;
@@ -451,7 +464,9 @@ const sfx={
   nope(){tone(220,.09,'square',.06);tone(196,.12,'square',.06,.1);},
   engine(){tone(70,.35,'sawtooth',.06,0,110);},
   gate(){tone(330,.12,'triangle',.18);tone(262,.18,'triangle',.18,.1);},
-  siren(){for(let i=0;i<3;i++){tone(700,.22,'sine',.08,i*.45,1000);tone(1000,.22,'sine',.08,i*.45+.22,700);}}
+  siren(){for(let i=0;i<3;i++){tone(700,.22,'sine',.08,i*.45,1000);tone(1000,.22,'sine',.08,i*.45+.22,700);}},
+  jackpot(m){const notes=[523,659,784,1046,1318,1568];const n=m>=10?6:m>=5?5:m>=3?4:3;for(let i=0;i<n;i++)tone(notes[i],.14,'square',.07,i*.07);},
+  sparkle(){tone(1760,.06,'sine',.06);tone(2349,.09,'sine',.05,.06);}
 };
 
 /* ---------- lajur ---------- */
@@ -499,6 +514,7 @@ function newDay(p){
   return {day:p.day,loc:p.loc,tarif:p.tarif,T:TARIF[p.tarif],events:p.events,
     clock:0,fares:0,tips:0,fines:0,target:targetFor(p.day,p.loc),
     komplain:0,caught:0,lost:0,served:0,left:0,streak:0,bestStreak:0,carsServed:0,special:0,xp:0,
+    luck:0,rejeki:0,dry:0,picked:0,drops:[],dropT:rand(DROP_GAP[0],DROP_GAP[1]),flashT:0,
     missions:(p.missions||[]).map(m=>({...m,done:false})),
     vehicles:[],queue:[],cols:makeCols(p.loc),spawnT:1.2,floaters:[],whistleT:0,shakeT:0,
     gateT:0,gateCd:0,internT:4,banner:null};
@@ -597,6 +613,18 @@ function collect(v,withTip){
       else label=' · Makasih, Bang!';
     }else S.streak=0;
   }
+  // Rejeki nomplok: rasio variabel dengan perlindungan nasib buruk
+  let luck=0;
+  if(withTip&&!v.special){
+    S.dry++;
+    if(Math.random()<Math.min(REJEKI_MAX,REJEKI_BASE+REJEKI_STEP*S.dry)){
+      const m=pickWeighted(REJEKI);
+      luck=v.pay*(m-1);S.dry=0;S.rejeki++;S.flashT=m>=5?.6:.3;
+      label=' · Rejeki x'+m+'!';sfx.jackpot(m);
+      if(m>=5)toast(m>=10?'REJEKI x10! Pengendaranya bayar pakai uang merah, gak minta kembalian.':'Rejeki x5! Hari ini lagi beruntung.');
+    }
+  }
+  S.luck+=luck;
   if(v.special){
     const bonus=SPECIAL_TIPS[Math.floor(Math.random()*SPECIAL_TIPS.length)];
     tip+=bonus;S.special++;
@@ -606,8 +634,21 @@ function collect(v,withTip){
   if(v.T.fits==='car')S.carsServed++;
   S.xp+=v.T.fits==='car'?2:1;
   S.fares+=v.pay;S.tips+=tip;S.served++;
-  S.floaters.push({x:v.x,y:v.y-30,t:0,txt:'+'+fmt(v.pay+tip)+label,color:v.special?'#ffd166':tip?'#e6f25a':'#4fd18b'});
-  sfx.coin(tip>=2000);
+  S.floaters.push({x:v.x,y:v.y-30,t:0,txt:'+'+fmt(v.pay+tip+luck)+label,color:(v.special||luck)?'#ffd166':tip?'#e6f25a':'#4fd18b',big:luck>0});
+  if(!luck)sfx.coin(tip>=2000);
+}
+/* Uang jatuh: muncul pada waktu acak, harus dipungut sebelum hilang */
+function spawnDrop(){
+  const spots=[[rand(20,400),rand(118,330)],[rand(20,380),rand(AISLE_Y-18,AISLE_Y+22)]];
+  const [x,y]=spots[Math.random()<.6?0:1];
+  S.drops.push({x,y,value:pickWeighted(DROPS),t:DROP_LIFE});
+  sfx.sparkle();
+}
+function pickDrop(d){
+  S.drops=S.drops.filter(x=>x!==d);
+  S.luck+=d.value;S.picked++;
+  S.floaters.push({x:d.x,y:d.y-10,t:0,txt:'+'+fmt(d.value)+' · uang jatuh',color:'#ffd166',big:d.value>=5000});
+  if(d.value>=5000)sfx.jackpot(5);else sfx.coin(false);
 }
 
 function checkMissions(final){
@@ -630,6 +671,11 @@ function update(dt){
 
   if(S.gateT>0){S.gateT-=dt;if(S.gateT<=0)toast('Palang dibuka lagi.');}
   if(S.gateCd>0)S.gateCd-=dt;
+  if(S.flashT>0)S.flashT-=dt;
+  S.dropT-=dt;
+  if(S.dropT<=0){S.dropT=rand(DROP_GAP[0],DROP_GAP[1]);if(S.drops.length<2)spawnDrop();}
+  for(const d of S.drops)d.t-=dt;
+  S.drops=S.drops.filter(d=>d.t>0);
   S.spawnT-=dt;
   if(S.spawnT<=0){
     const base=Math.max(1.4,5.2-.42*(Math.min(S.day,10)-1));
@@ -762,7 +808,7 @@ function drawScene(){
   }
   ctx.fillStyle='#55585e';ctx.fillRect(0,AISLE_Y-24,W,58);
   ctx.fillStyle='rgba(255,255,255,.55)';ctx.font='700 9px "JetBrains Mono", monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-  for(const c of S.cols)if(c.kind!=='trot')ctx.fillText(c.kind==='car'?'MOBIL':'MOTOR',c.x,AISLE_Y-15);
+  for(const c of S.cols)if(c.kind!=='trot')ctx.fillText(c.kind==='car'?'MOBIL':'MOTOR',c.x,c.top+c.h-10);
   ctx.fillStyle='rgba(255,255,255,.45)';
   for(let x=170;x<320;x+=60){ctx.beginPath();ctx.moveTo(x,AISLE_Y+4);ctx.lineTo(x+16,AISLE_Y+4);ctx.lineTo(x+16,AISLE_Y-1);ctx.lineTo(x+26,AISLE_Y+6);ctx.lineTo(x+16,AISLE_Y+13);ctx.lineTo(x+16,AISLE_Y+8);ctx.lineTo(x,AISLE_Y+8);ctx.closePath();ctx.fill();}
   // trotoar
@@ -907,9 +953,23 @@ function drawUI(){
       ctx.fillStyle='#fff';ctx.fillText('KABUR!',v.x,v.y-20);
     }
   }
+  for(const d of S.drops){
+    const pulse=1+Math.sin(performance.now()/120)*.08,blink=d.t<1.5&&Math.floor(d.t*8)%2===0;
+    if(blink)continue;
+    ctx.save();ctx.translate(d.x,d.y);ctx.scale(pulse,pulse);
+    ctx.fillStyle='rgba(255,209,102,.25)';ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
+    const big=d.value>=5000;
+    ctx.fillStyle=big?'#c0392b':'#4f8f5a';rrect(-15,-9,30,18,3);ctx.fill();
+    ctx.strokeStyle='#fbf7ec';ctx.lineWidth=1.5;rrect(-12,-6,24,12,2);ctx.stroke();
+    ctx.fillStyle='#fbf7ec';ctx.font='800 8px "JetBrains Mono", monospace';ctx.fillText(d.value>=1000?(d.value/1000)+'rb':'500',0,.5);
+    ctx.restore();
+    ctx.strokeStyle='#ffd166';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(d.x,d.y,20,-Math.PI/2,-Math.PI/2+Math.PI*2*(d.t/DROP_LIFE));ctx.stroke();
+  }
+  if(S.flashT>0){ctx.fillStyle=`rgba(255,209,102,${Math.min(.35,S.flashT*.6)})`;ctx.fillRect(0,0,W,H);}
   for(const f of S.floaters){
     ctx.globalAlpha=Math.max(0,1-f.t/1.3);
-    ctx.font='800 13px Poppins, sans-serif';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';
+    ctx.font=f.big?'800 17px Poppins, sans-serif':'800 13px Poppins, sans-serif';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';
     const fx=Math.min(W-90,Math.max(90,f.x));
     ctx.strokeText(f.txt,fx,f.y-f.t*30);ctx.fillStyle=f.color;ctx.fillText(f.txt,fx,f.y-f.t*30);
   }
@@ -977,7 +1037,10 @@ function dropTarget(v){return S.cols.find(c=>Math.abs(v.x-c.x)<=c.w/2+6&&v.y>=c.
 cv.addEventListener('pointerdown',e=>{
   if(phase!=='play'||paused)return;
   unlockAudio();
-  const p=toWorld(e),v=pick(p);
+  const p=toWorld(e);
+  const drop=S.drops.find(d=>Math.hypot(d.x-p.x,d.y-p.y)<24);
+  if(drop){pickDrop(drop);e.preventDefault();return;}
+  const v=pick(p);
   drag={id:e.pointerId,sx:p.x,sy:p.y,v,active:false,ox:0,oy:0};
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
   e.preventDefault();
@@ -1097,6 +1160,12 @@ function renderHome(){
   $('homeXp').textContent=nextT?`${save.xp} / ${nextT} XP`:`${save.xp} XP · pangkat tertinggi`;
   $('homeXpBar').style.width=(nextT?Math.min(100,(save.xp-RANKS[ri][0])/(nextT-RANKS[ri][0])*100):100)+'%';
   $('btnHomeAlbum').textContent=`Album ${Object.keys(save.album).length}/${SPECIALS.length}`;
+  const pct=n=>Math.round(n*100)+'%',share=t=>{const s=t.reduce((a,x)=>a+x[1],0);return t.map(([v,w])=>[v,Math.round(w/s*100)+'%']);};
+  $('oddsText').textContent=
+    `Rejeki nomplok: setiap tagihan punya peluang ${pct(REJEKI_BASE)}, naik ${pct(REJEKI_STEP)} setiap tagihan yang belum dapat, maksimal ${pct(REJEKI_MAX)}. `+
+    `Kalau dapat, tarifnya berlipat: ${share(REJEKI).map(([m,p])=>`x${m} (${p})`).join(', ')}. `+
+    `Uang jatuh muncul setiap ${DROP_GAP[0]}–${DROP_GAP[1]} detik dan hilang setelah ${String(DROP_LIFE).replace('.',',')} detik: ${share(DROPS).map(([v,p])=>`${fmt(v)} (${p})`).join(', ')}. `+
+    `Pelanggan spesial muncul di 7% kendaraan mulai hari 2. Semua hadiah hanya uang di dalam game, tidak bisa dibeli dengan uang sungguhan.`;
   if(save.best){$('homeBest').textContent=`Rekor: sampai hari ${save.best.day}, pendapatan terbaik ${fmt(save.best.money)} sehari.`;$('homeBest').hidden=false;}
   $('howto').open=save.day===1&&!save.best;
 }
@@ -1142,7 +1211,7 @@ let endInfo=null,shareText='';
 function endDay(reason){
   if(phase!=='play')return;
   phase='end';drag=null;paused=false;
-  const income=S.fares+S.tips,passed=reason==='time'&&income>=S.target;
+  const income=S.fares+S.tips+S.luck,passed=reason==='time'&&income>=S.target;
   // Urutan potongan: setoran bos, lalu makan, lalu denda. Yang tidak tertutup uangmu tidak jadi utang.
   const toBoss=passed?S.target:income;
   const before=save.saving;
@@ -1178,6 +1247,7 @@ function endDay(reason){
     `<div class="head">NOTA PARKIR · HARI ${S.day}</div>`+
     row(`Tarif parkir (${S.served} kendaraan)`,fmt(S.fares),'sub')+
     row('Tip & bonus Prima',fmt(S.tips),'sub')+
+    row(`Rejeki (${S.rejeki}x) & uang jatuh (${S.picked}x)`,fmt(S.luck),'sub')+
     row('Pendapatan',fmt(income))+
     row(passed?'Setoran ke bos':'Diambil bos (setoran kurang)',fmt(-toBoss),'neg')+
     row('Makan & kopi',fmt(-mealPaid),'neg')+
@@ -1200,7 +1270,7 @@ function endDay(reason){
   const albumLeft=SPECIALS.length-Object.keys(save.album).length;
   if(albumLeft)next.push(`<b>${albumLeft}</b> kendaraan langka belum masuk album.`);
   $('endNext').innerHTML=next.slice(0,3).map(x=>`<li>${x}</li>`).join('');
-  $('endMini').innerHTML=`<span>XP <b>+${S.xp}</b></span><span>Kabur tertangkap <b>${S.caught}</b></span><span>Lolos <b>${S.lost}</b></span><span>Komplain <b>${S.komplain}</b></span><span>Prima terbaik <b>x${S.bestStreak}</b></span><span>Pergi karena antre <b>${S.left}</b></span>`;
+  $('endMini').innerHTML=`<span>XP <b>+${S.xp}</b></span><span>Rejeki <b>${S.rejeki}x</b></span><span>Uang jatuh <b>${S.picked}x</b></span><span>Kabur tertangkap <b>${S.caught}</b></span><span>Lolos <b>${S.lost}</b></span><span>Komplain <b>${S.komplain}</b></span><span>Prima terbaik <b>x${S.bestStreak}</b></span><span>Pergi karena antre <b>${S.left}</b></span>`;
   $('btnNext').textContent=passed?`Siapkan hari ${S.day+1}`:`Ulangi hari ${S.day}`;
   shareText=`Kang Parkir hari ke-${S.day} di ${S.loc.name}: pendapatan ${fmt(income)}, tip ${fmt(S.tips)}, Prima x${S.bestStreak}, nangkep ${S.caught} motor kabur. ${passed?'Setoran aman!':'Setoran kurang, bos manyun.'} Kamu bisa lebih rapi?`;
   $('btnCopy').textContent='Salin hasil';
@@ -1269,9 +1339,9 @@ function hud(){
   $('hLoc').textContent=S.loc.name;
   $('hKomplain').textContent='●'.repeat(S.komplain)+'○'.repeat(Math.max(0,3-S.komplain));
   $('hMission').textContent=S.missions.length?S.missions.filter(m=>m.done).length+'/'+S.missions.length:'–';
-  const income=S.fares+S.tips;
+  const income=S.fares+S.tips+S.luck;
   $('hMoney').textContent=fmt(income);
-  $('hTip').textContent='(tip '+fmt(S.tips)+')';
+  $('hTip').textContent='(bonus '+fmt(S.tips+S.luck)+')';
   $('hTarget').textContent='Setoran '+fmt(S.target);
   const bar=$('hBar'),p=Math.min(1,income/S.target);
   bar.style.width=(p*100)+'%';bar.classList.toggle('done',p>=1);

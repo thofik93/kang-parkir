@@ -31,6 +31,10 @@ Game kasual satu jari tentang menjadi tukang parkir. Atur motor dan mobil di lah
   - Enam pangkat dengan bonus setiap naik pangkat.
   - Pelanggan spesial berbintang dengan tip besar, dan album untuk mengoleksinya.
   - Bonus kopi pagi saat bermain di hari berikutnya. Kalau terlewat, hitungannya mulai lagi tanpa ada yang hilang.
+- **Hadiah tak terduga (intermittent reinforcement):**
+  - **Rejeki nomplok** (rasio variabel): setiap tagihan berpeluang 4% berlipat x2/x3/x5/x10. Peluangnya naik 1% setiap tagihan yang belum dapat, maksimal 40%, jadi tidak ada nasib buruk yang terlalu panjang.
+  - **Uang jatuh** (interval variabel): muncul setiap 12–35 detik di parkiran dan hilang setelah 4,5 detik.
+  - Semua peluang ditampilkan di layar "Peluang hadiah" dan diambil langsung dari konstanta di kode, jadi selalu sesuai. Hadiahnya hanya uang di dalam game. Tidak ada keacakan yang bisa dibeli dengan uang sungguhan.
 
 Sengaja tidak ada sistem energi, loot box, timer yang memaksa, maupun streak yang menghukum.
 
