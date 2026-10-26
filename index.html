@@ -138,6 +138,10 @@ details[open] summary{margin-bottom:8px}
 .mini{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
 .mini b{color:var(--fg);font-family:var(--mono)}
 .verdict{font-weight:700}
+.consent{border:1px dashed var(--line,#ccc);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px}
+.consent p{margin:0 0 8px}
+.consent .row-btn{display:flex;gap:8px}
+.consent .row-btn button{flex:1}
 .verdict.good{color:var(--ok)}
 .verdict.bad{color:var(--danger)}
 
@@ -294,6 +298,10 @@ button.ghost{background:transparent}
           <div class="mini" id="endMini"></div>
           <h3>Selanjutnya</h3>
           <ul class="next" id="endNext"></ul>
+          <div class="consent" id="endConsent" hidden>
+            <p>Boleh kirim statistik main secara anonim? Kami jadi tahu bagian mana yang terlalu susah. Tanpa nama, tanpa akun.</p>
+            <div class="row-btn"><button id="btnConsentYes">Boleh</button><button class="ghost" id="btnConsentNo">Jangan</button></div>
+          </div>
           <button class="ghost secondary" id="btnCopy">Salin hasil</button>
           <div class="actions">
             <button class="primary" id="btnNext">Lanjut</button>
@@ -354,7 +362,13 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // dibuka dari portal Game Warga: tampilkan jalan pulang ke daftar game
-if(/(^|\.)gamewarga\./.test(location.hostname))document.getElementById('portalBack').hidden=false;
+const IN_PORTAL=/(^|\.)gamewarga\./.test(location.hostname);
+if(IN_PORTAL)document.getElementById('portalBack').hidden=false;
+/* Statistik pemakaian (GA4) lewat gw.js milik portal, desain di gamewarga/docs/ANALYTICS.md. Hanya angka dan label. */
+const GW_ORIGIN=IN_PORTAL?'':'https://gamewarga.thofik93.workers.dev'; // ganti ke https://gamewarga.com setelah domain aktif
+const track=(name,params)=>{(window.gwq=window.gwq||[]).push([name,params]);};
+if(location.protocol!=='file:'){const s=document.createElement('script');s.src=GW_ORIGIN+'/gw.js';s.async=true;s.dataset.game='kangparkir';document.head.appendChild(s);}
+const consentAsked=()=>{try{return localStorage.getItem('gw:consent')!=null;}catch(e){return true;}};
 
 /* ---------- penyimpanan ---------- */
 const store={
@@ -635,7 +649,7 @@ function collect(v,withTip){
     const bonus=SPECIAL_TIPS[Math.floor(Math.random()*SPECIAL_TIPS.length)];
     tip+=bonus;S.special++;
     label=' · '+v.special.name+' kasih '+fmt(bonus)+'!';
-    if(!save.album[v.special.id]){save.album[v.special.id]=true;persist();setTimeout(()=>toast('Baru di album: '+v.special.name+'!'),900);}
+    if(!save.album[v.special.id]){save.album[v.special.id]=true;track('unlock_achievement',{achievement_id:'album:'+v.special.id});persist();setTimeout(()=>toast('Baru di album: '+v.special.name+'!'),900);}
   }
   if(v.T.fits==='car')S.carsServed++;
   S.xp+=v.T.fits==='car'?2:1;
@@ -739,7 +753,7 @@ function update(dt){
     }
     if(!v.dragged)move(v,dt);
     if((v.state==='exiting'||v.state==='leaving')&&!v.path.length){
-      if(v.state==='exiting'&&v.kabur&&!v.caught){S.lost++;S.streak=0;toast('Yah, kabur tanpa bayar.');}
+      if(v.state==='exiting'&&v.kabur&&!v.caught){S.lost++;track('vehicle_escaped',{vehicle:v.T.fits==='car'?'mobil':'motor',level:S.day});S.streak=0;toast('Yah, kabur tanpa bayar.');}
       v.state='gone';
     }
   }
@@ -1207,7 +1221,9 @@ function renderPrep(){
 
 function startDay(){
   unlockAudio();
-  S=newDay(plan);phase='play';paused=false;nextId=1;
+  S=newDay(plan);phase='play';paused=false;nextId=1;S.t0=Date.now();
+  track('game_start',{mode:'karier'});
+  track('level_start',{level:S.day,location:S.loc.id,tariff:S.tarif});
   hints.tap=false;$('hint').textContent='Seret kendaraan di jalan ke lajur parkir.';
   showCard(null);
   toast(`Jam 06:00 di ${S.loc.name}. Setoran hari ini ${fmt(S.target)}.`);
@@ -1240,6 +1256,12 @@ function endDay(reason){
   persist();
   plan=null;
   endInfo={passed,day:S.day};
+  const dur=Math.round((Date.now()-S.t0)/1000);
+  track('level_end',{level:S.day,success:passed,earned:income,escaped:S.lost,location:S.loc.id});
+  if(reason==='quit')track('game_quit',{stage:'day',level:S.day,duration_s:dur});
+  else track('game_end',{result:passed?'win':reason==='fired'?'fired':'lose',level:S.day,duration_s:dur});
+  // tanya izin statistik sekali, setelah hari pertama selesai (bukan di layar pembuka)
+  $('endConsent').hidden=consentAsked();
 
   $('endEyebrow').textContent=`Hari ${S.day} · ${S.loc.name} · ${clockStr(Math.min(S.clock,DAY_LEN))}`;
   if(reason==='fired'){$('endTitle').textContent='Kamu diusir pemilik lahan.';$('endVerdict').textContent='Tiga komplain dalam sehari. Jangan biarkan kendaraan keblokir.';}
@@ -1302,11 +1324,11 @@ function renderShop(){
   }).join('');
   for(const b of document.querySelectorAll('[data-gear]'))b.onclick=()=>{
     const g=GEAR.find(x=>x.id===b.dataset.gear);if(!g||save.saving<g.price)return;
-    save.saving-=g.price;save.gear[g.id]=true;persist();sfx.coin(true);renderShop();
+    save.saving-=g.price;save.gear[g.id]=true;track('spend_virtual_currency',{virtual_currency_name:'tabungan',value:g.price,item_name:'gear:'+g.id});persist();sfx.coin(true);renderShop();
   };
   for(const b of document.querySelectorAll('[data-style]'))b.onclick=()=>{
     const [slot,id]=b.dataset.style.split(':'),s=STYLE.find(x=>x.slot===slot&&x.id===id);if(!s||save.saving<s.price)return;
-    save.saving-=s.price;save.owned.push(slot+':'+id);save.style[slot]=id;persist();sfx.coin();renderShop();
+    save.saving-=s.price;save.owned.push(slot+':'+id);track('spend_virtual_currency',{virtual_currency_name:'tabungan',value:s.price,item_name:slot+':'+id});save.style[slot]=id;persist();sfx.coin();renderShop();
   };
   for(const b of document.querySelectorAll('[data-wear]'))b.onclick=()=>{
     const [slot,id]=b.dataset.wear.split(':');save.style[slot]=id;persist();renderShop();
@@ -1332,7 +1354,11 @@ $('btnResume').onclick=()=>pause(false);
 $('btnGiveUp').onclick=()=>{paused=false;endDay('quit');};
 $('btnPause').onclick=()=>pause(!paused);
 $('btnMute').onclick=()=>{muted=!muted;$('btnMute').textContent=muted?'Suara: mati':'Suara';$('btnMute').setAttribute('aria-pressed',String(muted));};
+const answerConsent=ok=>{track('_consent',ok);try{localStorage.setItem('gw:consent',ok?'granted':'denied');}catch(e){}$('endConsent').hidden=true;};
+$('btnConsentYes').onclick=()=>answerConsent(true);
+$('btnConsentNo').onclick=()=>answerConsent(false);
 $('btnCopy').onclick=()=>{
+  track('share',{method:'copy',content_type:'result'});
   const fallback=()=>{$('btnCopy').textContent='Gagal menyalin';toast(shareText);};
   try{navigator.clipboard.writeText(shareText).then(()=>{$('btnCopy').textContent='Tersalin';},fallback);}catch(e){fallback();}
 };
