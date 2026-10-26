@@ -1,0 +1,7 @@
+# Game ini di portal gamewarga.com/kangparkir/: Worker aset statis dari dist-web/ (hasil scripts/build-web.mjs).
+# Domain dipasang di Worker portal (repo gamewarga), yang meneruskan jalur /kangparkir/ ke Worker ini.
+name = "kangparkir"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "../dist-web"
