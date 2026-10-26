@@ -2,7 +2,7 @@
 
 Game kasual satu jari tentang menjadi tukang parkir. Atur motor dan mobil di lahan sempit, tiup peluit, tagih tarifnya, dan jangan sampai ada yang kabur tanpa bayar. Tersedia di web, dan siap dirilis untuk Android dan iOS.
 
-**Main di browser:** https://thofik93.github.io/kang-parkir/
+**Main di browser:** https://gamewarga.com/kangparkir/
 
 ## Cara main
 

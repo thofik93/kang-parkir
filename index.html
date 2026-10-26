@@ -365,7 +365,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const IN_PORTAL=/(^|\.)gamewarga\./.test(location.hostname);
 if(IN_PORTAL)document.getElementById('portalBack').hidden=false;
 /* Statistik pemakaian (GA4) lewat gw.js milik portal, desain di gamewarga/docs/ANALYTICS.md. Hanya angka dan label. */
-const GW_ORIGIN=IN_PORTAL?'':'https://gamewarga.thofik93.workers.dev'; // ganti ke https://gamewarga.com setelah domain aktif
+const GW_ORIGIN=IN_PORTAL?'':'https://gamewarga.com';
 const track=(name,params)=>{(window.gwq=window.gwq||[]).push([name,params]);};
 if(location.protocol!=='file:'){const s=document.createElement('script');s.src=GW_ORIGIN+'/gw.js';s.async=true;s.dataset.game='kangparkir';document.head.appendChild(s);}
 const consentAsked=()=>{try{return localStorage.getItem('gw:consent')!=null;}catch(e){return true;}};
