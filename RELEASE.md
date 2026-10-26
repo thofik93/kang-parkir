@@ -9,7 +9,7 @@ Panduan ini untuk merilis Kang Parkir versi aplikasi. Kode native sudah siap: ap
 | Akun | [Google Play Console](https://play.google.com/console), sekali bayar USD 25 | [Apple Developer Program](https://developer.apple.com/programs/), USD 99 per tahun |
 | Alat | Android Studio (JDK 21 bawaannya dipakai oleh skrip build) | Xcode di Mac |
 | ID aplikasi | `io.github.thofik93.kangparkir` | `io.github.thofik93.kangparkir` |
-| Kebijakan privasi | https://thofik93.github.io/kang-parkir/privacy.html | sama |
+| Kebijakan privasi | https://gamewarga.com/kangparkir/privacy | sama |
 
 ID aplikasi tidak bisa diubah setelah rilis pertama. Kalau mau ganti, ubah dulu di `capacitor.config.json`, `android/app/build.gradle` (`namespace` dan `applicationId`), dan Bundle Identifier di Xcode.
 

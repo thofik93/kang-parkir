@@ -380,6 +380,20 @@ if(location.protocol!=='file:'){const s=document.createElement('script');s.src=G
 const consentAsked=()=>{try{return localStorage.getItem('gw:consent')!=null;}catch(e){return true;}};
 
 /* ---------- penyimpanan ---------- */
+/* Pindahan dari thofik93.github.io: halaman lama membawa progres lewat #gw-import (bagian # tidak pernah dikirim ke server).
+   Hanya mengisi yang belum ada, atau mengganti progres yang lebih sedikit. */
+(function(){
+  const m=location.hash.match(/gw-import=([^&]+)/);if(!m)return;
+  try{
+    const d=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));
+    for(const k of Object.keys(d)){
+      if(!k.startsWith('kangparkir:'))continue;
+      const cur=localStorage.getItem(k);
+      if(cur==null||(k==='kangparkir:save2'&&(JSON.parse(d[k]).xp||0)>(JSON.parse(cur).xp||0)))localStorage.setItem(k,d[k]);
+    }
+  }catch(e){}
+  history.replaceState(null,'',location.pathname+location.search);
+})();
 const store={
   get(k,d){try{const v=localStorage.getItem('kangparkir:'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
   set(k,v){try{localStorage.setItem('kangparkir:'+k,JSON.stringify(v));}catch(e){}}
