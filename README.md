@@ -1,0 +1,1 @@
+Cabang ini hanya untuk GitHub Pages lama: semua alamat thofik93.github.io/kang-parkir/ dialihkan ke https://gamewarga.com/kangparkir/ (progres pemain dibawa lewat #gw-import). Kode game ada di cabang main.
