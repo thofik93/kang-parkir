@@ -40,7 +40,10 @@ Sengaja tidak ada sistem energi, loot box, timer yang memaksa, maupun streak yan
 
 ## Teknis
 
-- `index.html`: seluruh game dalam satu file. Grafis memakai Canvas 2D, suara dibuat dengan WebAudio, dan progres disimpan di `localStorage`. Tanpa build dan tanpa dependensi. File ini juga yang ditayangkan di GitHub Pages.
+- `index.html`: seluruh game dalam satu file. Grafis memakai Canvas 2D, suara dibuat dengan WebAudio, dan progres disimpan di `localStorage`. Tanpa build dan tanpa dependensi.
+- Web: disajikan di portal https://gamewarga.com/kangparkir/ (repo `thofik93/gamewarga`). `node scripts/build-web.mjs && npx wrangler@4.152.0 deploy -c web/wrangler.toml` membangun `dist-web/kangparkir/` dan men-deploy Worker aset statis `kangparkir`, yang hanya bisa dijangkau lewat portal (`workers_dev = false`). GitHub Pages lama hanya berisi halaman pindahan (cabang `gh-pages`) yang membawa progres ke gamewarga.com lewat `#gw-import`.
+- Statistik pemakaian: Google Analytics 4 lewat `gw.js` portal. Izin ditanya sekali lewat kotak kecil di layar akhir hari pertama. Desainnya di `gamewarga/docs/ANALYTICS.md`.
+- SEO: canonical, Open Graph, dan `VideoGame` JSON-LD di `<head>`.
 - `android/`, `ios/`: proyek native [Capacitor 7](https://capacitorjs.com) yang membungkus `index.html`.
 - `privacy.html`: kebijakan privasi untuk toko aplikasi.
 - `scripts/`: menyalin web ke `www/` dan membuat gambar sumber ikon dan splash.
